@@ -3,36 +3,49 @@
 from tkinter import *
 from random import random, randint
 
+# PARAMETERS
+
+canh, canw = 350, 1000         # canva dimensions in px
+
+max_nb_jumps = 3               # max number of consecutive jumps
+dt = 50                        # time step in ms
+
+
+# CLASSES
 
 class Box:
     """A simple box object
        Box can collide with each others"""
 
-    def __init__(self, can, x, y, w, h, color='violet'):
-        self.can = can
+    def __init__(self, x, y, w, h):
+        """(x,y) is the top-left corner of the box"""
         self.x = x
         self.y = y
         self.w = w
         self.h = h
         self.x2 = x + w
         self.y2 = y + h
-        self.obj = can.create_rectangle(x, y, self.x2, self.y2, fill=color)
 
-    def redraw(self, newx, newy):
-        self.can.coords(self.obj, newx, newy, newx + self.w, newy + self.h)
-        if newx < -self.w - 10:
-            self.w = randint(10, 50)
-            self.h = randint(10, 40)
-            self.x += self.can.winfo_width() * (1 + random())
-            self.y = self.can.winfo_height() - self.h
-
-    def collide(self):
+    def collide(self, box):
         """pos relative = self.pos - pos"""
-        global x, y, w, h  # uni est gauche, dessus, droite, dessous
-        if 100 + w <= self.x - x or y + h <= self.y or self.x + self.w - x <= 100 or self.y + self.h <= y:
+        if (box.x + box.w <= self.x  # the other box is left, over, right, under
+                or box.y + box.h <= self.y
+                or self.x + self.w <= box.x
+                or self.y + self.h <= box.y):
             return False
         return True
 
 
 class DrawableBox(Box):
     """A bow that can be drawn on a canva"""
+
+    def __init__(self, x, y, w, h, can, obj=None, color='violet'):
+        Box.__init__(self, x, y, w, h,)
+        self.can = can
+        if obj:
+            self.obj = obj
+        else:
+            self.obj = can.create_rectangle(x, y, self.x2, self.y2, fill=color)
+
+    def redraw(self, newx, newy):
+        self.can.coords(self.obj, newx, newy, newx + self.w, newy + self.h)
