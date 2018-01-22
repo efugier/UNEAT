@@ -1,1 +1,2 @@
 # UNEAT
+An implementation from scratch of a general-purpose algorithm performing *NeuroEvolution through Augmenting Topologies* in python. The goal is to produce a single python module capable of both creating and training a Neural Network solving the widest possible range of problems (from prediction to a simple game AI). For now, it is more of proof of concept and a way to become comfortable with Neural Networks and Genetic Algorithms.
