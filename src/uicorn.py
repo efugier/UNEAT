@@ -5,9 +5,10 @@ from random import random, randint
 
 # PARAMETERS
 
-canh, canw = 350, 1000         # canvas dimensions in px
+CANH, CANW = 350, 1000         # canvas dimensions in px
 
-max_nb_jumps = 3               # max number of consecutive jumps
+MAX_NB_JUMPS = 3               # max number of consecutive jumps
+
 dt = 50                        # time step in ms
 
 
@@ -25,18 +26,28 @@ class Box:
         self.x2 = x + w
         self.y2 = y + h
 
+        # Physics
+        self.dx = 0
+        self.dy = 0
+
+    def set_dx(self, dx):
+        self.dx = dx
+
+    def set_dy(self, dy):
+        self.dy = dy
+
+    def update(self):
+        """Updates the position"""
+        self.x += self.dx * dt
+        self.y += self.dy * dt
+
     def collide(self, box):
-        """pos relative = self.pos - pos"""
         if (box.x + box.w <= self.x  # the other box is left, over, right, under
-                or box.y + box.h <= self.y
+                or box.y <= self.y + self.h
                 or self.x + self.w <= box.x
-                or self.y + self.h <= box.y):
+                or self.y <= box.y + box.h):
             return False
         return True
-
-    def reposition(self, newx, newy):
-        self.x, self.y = newx, newy
-        self.x2, self.y2 = newx + self.w, newy + self.h
 
 
 class DrawableBox(Box):
@@ -45,34 +56,59 @@ class DrawableBox(Box):
     def __init__(self, x, y, w, h, can, obj=None, color='violet'):
         Box.__init__(self, x, y, w, h,)
         self.can = can
+        self.alive = True
         if obj:
             self.obj = obj
+            self.is_image = True
         else:
             self.obj = can.create_rectangle(x, y, self.x2, self.y2, fill=color)
+            self.is_image = False
 
-    def reposition(self, newx, newy):
-        Box.reposition(self, newx, newy)
-        self.can.coords(self.obj, newx, newy, newx + self.w, newy + self.h)
+    def update(self):
+        """Updates the position and the drawing's position"""
+        Box.update(self)
+        if self.is_image:
+            self.can.coords(self.obj, self.x, self.y)
+        else:
+            self.can.coords(self.obj, self.x, self.y,
+                            self.x + self.w, self.y + self.h)
 
     def erase(self):
         self.can.delete(self)
 
 
-class Obsatcle(DrawableBox):
-    """An obstacle which the unicorn lust avoid"""
-
-    def __init__(self, x, y, w, h, can, obj=None, color='violet'):
-        DrawableBox.__init__(self, x, y, w, h, can, None, color='violet')
-
-    def update(self, v):
-        """updates the box going left at a speed v"""
-        self.reposition(self.x - v * dt, self.y)
-        if self.x < -self.w:  # removes the box if it is out of the screen
-            self.erase()
-
-
 class Unicorn(DrawableBox):
     def __init__(self, x, y, w, h, can, obj=None, color='violet'):
+        DrawableBox.__init__(self, x, y, w, h, can, obj, color='violet')
+        self.nb_jumps = 0
+        self.update()
 
-        DrawableBox.__init__(self, x, y, w, h, can,
-                             obj=tk.PhotoImage(file="../img/unicorn.png"), color='violet')
+    def jump(self):
+        if self.nb_jumps < MAX_NB_JUMPS and self.dy >= 0:
+            self.nb_jumps += 1
+            self.dy -= 0.5
+
+    def update(self):
+        DrawableBox.update(self)
+        if self.y + self.h > CANH:  # Prevents the unicorn from going underground
+            self.dy = 0
+            self.y = 0
+
+
+# FUNCTIONS
+
+def randomObstacle():
+    """Generates a random obstacle"""
+    pass
+
+
+root = tk.Tk()
+root.title("Jumping Unicorn")
+can = tk.Canvas(root, bg='purple', height=CANH, width=CANW)
+can.pack()
+
+photo = tk.PhotoImage(file="../img/unicorn.png")
+uni_drawing = can.create_image(100, CANH - 50, anchor=tk.NW, image=photo)
+uni = Unicorn(100, CANH - 50, 50, 50, can, uni_drawing)
+
+root.mainloop()
