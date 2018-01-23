@@ -69,3 +69,10 @@ class Obsatcle(DrawableBox):
         self.reposition(self.x - v * dt, self.y)
         if self.x < -self.w:  # removes the box if it is out of the screen
             self.erase()
+
+
+class Unicorn(DrawableBox):
+    def __init__(self, x, y, w, h, can, obj=None, color='violet'):
+
+        DrawableBox.__init__(self, x, y, w, h, can,
+                             obj=tk.PhotoImage(file="../img/unicorn.png"), color='violet')
