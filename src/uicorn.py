@@ -43,9 +43,9 @@ class Box:
 
     def collide(self, box):
         if (box.x + box.w <= self.x  # the other box is left, over, right, under
-                or box.y <= self.y + self.h
+                or box.y + box.h <= self.y
                 or self.x + self.w <= box.x
-                or self.y <= box.y + box.h):
+                or self.y + self.h <= box.y):
             return False
         return True
 
@@ -104,7 +104,7 @@ class World:
 
         self.unicorn = tk_unicorn
         self.obstacle_list = []
-        self.speed = 0
+        self.speed = 0.2
         self.score = 0
 
     def createObstacle(self):
@@ -124,7 +124,7 @@ class World:
 
         # Reseting the unicorn
         self.unicorn.x = 100
-        self.unicorn.y = self.unicorn.h
+        self.unicorn.y = CANH - self.unicorn.h
         self.unicorn.dx = 0
         self.unicorn.dy = 0
         self.unicorn.alive = True
@@ -134,13 +134,24 @@ class World:
         for _ in range(3):
             self.obstacle_list.append(self.createObstacle())
 
+        self.gameEngine()
+
     def update(self):
+        self.unicorn.update()
+
         for i, obs in enumerate(self.obstacle_list):
+            obs.dx = -self.speed
             obs.update()
+            if self.unicorn.collide(obs):
+                self.unicorn.alive = False
             if obs.x + obs.w < 0:  # If the obstacle goes out of the screen
                 self.obstacle_list[i] = self.createObstacle()
 
-        self.unicorn.update()
+    def gameEngine(self):
+        self.speed *= 1.0001
+        self.update()
+        if self.unicorn.alive:
+            self.root.after(dt, self.gameEngine)
 
 
 # FUNCTIONS
