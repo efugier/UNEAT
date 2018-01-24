@@ -86,26 +86,46 @@ class Unicorn(DrawableBox):
     def jump(self):
         if self.nb_jumps < MAX_NB_JUMPS and self.dy >= 0:
             self.nb_jumps += 1
-            self.dy -= 0.5
+            self.dy -= 0.25
 
     def update(self):
         DrawableBox.update(self)
         if self.y + self.h > CANH:  # Prevents the unicorn from going underground
             self.dy = 0
-            self.y = 0
+            self.y = CANH - self.h
+            self.nb_jumps = 0
 
 
 class World:
     """The world in which the unicron runs"""
 
-    def __init__(self, tk_root, tk_can, tk_unicorn):
+    def __init__(self, tk_root):
         self.root = tk_root
-        self.can = tk_can
+        self.root.title("Jumping Unicorn")
+        self.can = tk.Canvas(root, bg='purple', height=CANH, width=CANW)
+        self.init2()
 
-        self.unicorn = tk_unicorn
-        self.obstacle_list = []
+    def init2(self):
+        self.can.delete(tk.ALL)
         self.speed = 0.2
         self.score = 0
+
+        self.obstacle_list = []
+        for _ in range(3):
+            self.obstacle_list.append(self.createObstacle())
+
+        # We have to keep everything binded to prevent it from being garbage collected
+        self.uni_img = tk.PhotoImage(file="../img/unicorn.png")
+        self.uni_drawing = self.can.create_image(
+            100, CANH - 50, anchor=tk.NW, image=self.uni_img)
+
+        self.unicorn = Unicorn(100, CANH - 50, 50, 50,
+                               self.can, self.uni_drawing)
+
+        self.root.bind("<space>", self.jump)
+        self.root.bind("<r>", self.reset)
+
+        self.can.pack()
 
     def createObstacle(self):
         """Adds a new obstable arbitrarly generated"""
@@ -113,28 +133,18 @@ class World:
             x_max = max(CANW, max([obs.x for obs in self.obstacle_list]))
         else:
             x_max = CANW
-        x = x_max + 100 + int(random() * CANW)
+        x = x_max + 250 + int(random() * CANW)
         h = max(10, int(random() * 40))
         y = CANH - h
         w = max(10, random() * 30)
         return DrawableBox(x, y, w, h, self.can)
 
     def reset(self, event=None):
-        self.score = 0
-
-        # Reseting the unicorn
-        self.unicorn.x = 100
-        self.unicorn.y = CANH - self.unicorn.h
-        self.unicorn.dx = 0
-        self.unicorn.dy = 0
-        self.unicorn.alive = True
-
-        # Reseting the obstacles
-        self.obstacle_list = []
-        for _ in range(3):
-            self.obstacle_list.append(self.createObstacle())
-
+        self.init2()
         self.gameEngine()
+
+    def jump(self, event=None):
+        self.unicorn.jump()
 
     def update(self):
         self.unicorn.update()
@@ -147,26 +157,24 @@ class World:
             if obs.x + obs.w < 0:  # If the obstacle goes out of the screen
                 self.obstacle_list[i] = self.createObstacle()
 
+        # Gravity
+        self.unicorn.dy += 0.02
+
     def gameEngine(self):
-        self.speed *= 1.0001
+        self.speed *= 1.001
         self.update()
+        self.score += self.speed
         if self.unicorn.alive:
             self.root.after(dt, self.gameEngine)
+        else:
+            print(self.score)
 
 
-# FUNCTIONS
-
+# Initialization
 
 root = tk.Tk()
-root.title("Jumping Unicorn")
-can = tk.Canvas(root, bg='purple', height=CANH, width=CANW)
-can.pack()
 
-photo = tk.PhotoImage(file="../img/unicorn.png")
-uni_drawing = can.create_image(100, CANH - 50, anchor=tk.NW, image=photo)
-unicorn = Unicorn(100, CANH - 50, 50, 50, can, uni_drawing)
-
-world = World(root, can, unicorn)
+world = World(root)
 world.reset()
 
 root.mainloop()
