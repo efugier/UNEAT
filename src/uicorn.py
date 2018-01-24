@@ -1,7 +1,7 @@
 # Simple game which is to be solved by the NEAT algorithm
 
 import tkinter as tk
-from random import random, randint
+from random import random
 
 # PARAMETERS
 
@@ -95,11 +95,52 @@ class Unicorn(DrawableBox):
             self.y = 0
 
 
-# FUNCTIONS
+class World:
+    """The world in which the unicron runs"""
 
-def randomObstacle():
-    """Generates a random obstacle"""
-    pass
+    def __init__(self, tk_root, tk_can, tk_unicorn):
+        self.root = tk_root
+        self.can = tk_can
+
+        self.unicorn = tk_unicorn
+        self.obstacle_list = []
+        self.speed = 0
+        self.score = 0
+
+    def createObstacle(self):
+        """Adds a new obstable arbitrarly generated"""
+        x_max = max(CANW, max([obs.x for obs in self.obstacle_list]))
+        x = x_max + 100 + int(random() * CANW)
+        h = max(10, int(random() * 40))
+        y = CANH - h
+        w = max(10, random() * 30)
+        return DrawableBox(x, y, w, h, self.can)
+
+    def reset(self, event=None):
+        self.score = 0
+
+        # Reseting the unicorn
+        self.unicorn.x = 100
+        self.unicorn.y = self.unicorn.h
+        self.unicorn.dx = 0
+        self.unicorn.dy = 0
+        self.unicorn.alive = True
+
+        # Reseting the obstacles
+        self.obstacle_list = []
+        for _ in range(3):
+            self.obstacle_list.append(self.createObstacle())
+
+    def update(self):
+        for i, obs in enumerate(self.obstacle_list):
+            obs.update()
+            if obs.x + obs.w < 0:  # If the obstacle goes out of the screen
+                self.obstacle_list[i] = self.createObstacle()
+
+        self.unicorn.update()
+
+
+# FUNCTIONS
 
 
 root = tk.Tk()
@@ -109,6 +150,9 @@ can.pack()
 
 photo = tk.PhotoImage(file="../img/unicorn.png")
 uni_drawing = can.create_image(100, CANH - 50, anchor=tk.NW, image=photo)
-uni = Unicorn(100, CANH - 50, 50, 50, can, uni_drawing)
+unicorn = Unicorn(100, CANH - 50, 50, 50, can, uni_drawing)
+
+world = World(root, can, unicorn)
+world.reset()
 
 root.mainloop()
