@@ -15,7 +15,7 @@ dt = 50                        # time step in ms
 # CLASSES
 
 class Box:
-    """A simple box object with can collide with others"""
+    """A simple box object which can collide with others"""
 
     def __init__(self, x, y, w, h):
         """(x,y) is the top-left corner of the box"""
@@ -109,7 +109,10 @@ class World:
 
     def createObstacle(self):
         """Adds a new obstable arbitrarly generated"""
-        x_max = max(CANW, max([obs.x for obs in self.obstacle_list]))
+        if self.obstacle_list:
+            x_max = max(CANW, max([obs.x for obs in self.obstacle_list]))
+        else:
+            x_max = CANW
         x = x_max + 100 + int(random() * CANW)
         h = max(10, int(random() * 40))
         y = CANH - h
