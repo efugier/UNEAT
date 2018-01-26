@@ -7,6 +7,8 @@ Neurone € dictionnary
 Connections
 """
 
+from copy import deepcopy
+from random import random, choice
 from numpy import tanh
 
 
@@ -28,7 +30,7 @@ class Connexion:
         self.w = w
 
 
-class Neuron:  # pylint: disable=too-few-public-methods
+class Neuron:
     """A very basic neuron which has a value, an id, and a list of input"""
 
     # pylint: disable=too-few-public-methods
@@ -67,8 +69,9 @@ class NeuralNetwork:
         # recursive connexion must be treated seprately
         self.recursive_connexions = []
 
-    def generate_netork(self):  # O(|self.connexions|)
-        """generates the neural network using its connexion list"""
+    def generate_netork(self):
+        """generates the neural network using its connexion list
+            O(|self.connexions|)"""
         self.neurons = {}
 
         for e in range(self.nb_input):
@@ -88,9 +91,10 @@ class NeuralNetwork:
                 if not c.i in self.neurons[c.o].input_list:
                     self.neurons[c.o].input_list.append(c.i)
 
-    def evaluate_network(self, input_vector):  # O(|self.connexions|)
+    def evaluate_network(self, input_vector):
         """evaluates the neural network
-           basically a depth first search"""
+           basically a depth first search
+           O(|self.connexions|)"""
         for i in range(self.nb_input):
             self.neurons[i].value = input_vector[i]
             self.neurons[i].already_evaluated = True
@@ -130,7 +134,7 @@ class NeuralNetwork:
 
 
 class SpawingPool:
-    """The class which supervise the evolution"""
+    """The class which supervises the evolution"""
 
     # pylint: disable=too-many-instance-attributes
     # This class' very purpose is to encapsulate the evolution's variables
@@ -158,3 +162,70 @@ class SpawingPool:
 
 def activation_funtion(x):
     return tanh(x)
+
+
+# Shaping functions
+
+def isForward(neuron_id1, neuron_id2, neurons):
+    """Makes sure a feed forward connexion should go from id1 to id2
+       return True if yes, False if no
+       O(|connexions|)"""
+
+    for i in neurons[neuron_id2].input_list:
+        if neuron_id2 == i or not isForward(neuron_id1, i, neurons):
+            return False
+
+    return True
+
+
+def newConnexion(nn: NeuralNetwork, force_input=False):
+    """Creates a connexion between two unconnected neurons the feed forward way
+       force_input forces a connexion from one of the input nodes
+       O(|neurons|^2)"""
+
+    if force_input:
+        neuron_id1 = choice(range(nn.nb_input))
+        candidates = [id1 for id1 in nn.neurons
+                      if id1 != neuron_id1 and not neuron_id1 in nn.neurons[id1].input_list]
+        if candidates:
+            neuron_id2 = choice(candidates)
+            nn.connexions.append(
+                Connexion(neuron_id1, neuron_id2, 2 * random() - 1))
+
+    else:
+        neuron_id2 = choice(nn.neurons.keys())
+        candidates = [id1 for id1 in nn.neurons
+                      if id1 != neuron_id2 and not id1 in nn.neurons[neuron_id2].input_list]
+
+        if candidates:
+            neuron_id1 = choice(candidates)
+
+            # Making sure the connexion is well oriented
+            if not isForward(neuron_id1, neuron_id2, nn.neurons):
+                neuron_id1, neuron_id2 = neuron_id2, neuron_id1
+
+            nn.connexions.append(
+                Connexion(neuron_id1, neuron_id2, 2 * random() - 1))
+
+
+def newRecusiveConnexion(nn: NeuralNetwork, force_input=False):
+    """Creates a connexion between two unconnected neurons the recursive way
+       force_input forces a connexion to one of the input nodes
+       O(|neurons|*|recursive_connexions|)"""
+
+    if force_input:
+        neuron_id2 = choice(range(nn.nb_input))
+    else:
+        neuron_id2 = choice(nn.neurons.keys())
+
+    candidates = []
+    for id1 in nn.neurons:
+        for c in nn.recursive_connexions:
+            if not (c.i == id1 and c.o == neuron_id2):
+                candidates.append(id1)
+
+    if candidates:
+        neuron_id1 = choice(candidates)
+
+        nn.connexions.append(
+            Connexion(neuron_id1, neuron_id2, 2 * random() - 1))

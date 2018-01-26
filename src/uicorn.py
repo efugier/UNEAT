@@ -30,12 +30,6 @@ class Box:
         self.dx = 0
         self.dy = 0
 
-    def set_dx(self, dx):
-        self.dx = dx
-
-    def set_dy(self, dy):
-        self.dy = dy
-
     def update(self):
         """Updates the position"""
         self.x += self.dx * dt
