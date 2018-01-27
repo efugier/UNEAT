@@ -113,7 +113,6 @@ class NeuralNetwork:
 
         # Setting the input values
         self.neurons[0].value = 1  # Bias node
-
         for i in range(1, self.nb_input):
             self.neurons[i].value = input_vector[i]
             self.neurons[i].already_evaluated = True
@@ -122,7 +121,7 @@ class NeuralNetwork:
         res = [self.evaluate_neuron(o)
                for o in range(self.nb_input, self.nb_output)]
 
-        # Storing the useful values for the recursive connexions
+        # Storing the values that are useful for the recursive connexions
         temp = {}
         for c in self.recursive_connexions:
             temp[c.o] = self.neurons[c.i].value
@@ -140,10 +139,8 @@ class NeuralNetwork:
 
     def evaluate_neuron(self, neuron_id):
         """Recursive function that evaluates a neuron
-           By evluating its conexions"""
-        # Should work because it would be a pointer the neuron
-        # Needs to be tested though
-        neuron = self.neurons[neuron_id]
+           by evluating its conexions"""
+        neuron = self.neurons[neuron_id]  # Pointer for faster access and cleaner code
         if neuron.already_evaluated:
             return neuron.value
 
@@ -254,14 +251,16 @@ def newRecusiveConnexion(nn: NeuralNetwork, force_input=False):
 # Service functions
 
 def save(obj, file_name='latest_NN'):
+    """Saves an object"""
     with open(file_name, 'wb') as file_:
         pickler = Pickler(file_)
         pickler.dump(obj)
 
-    print("Saved as ", file_name)
+    print("Saved", obj, " as ", file_name)
 
 
 def load(file_name='latest_NN'):
+    """Loads a saved object"""
     with open(file_name, 'rb') as file_:
         unpickler = Unpickler(file_)
         obj = unpickler.load()
