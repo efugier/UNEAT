@@ -5,6 +5,14 @@ This module contains:
         - newConnexion
         - newRecursiveConnexion
     - save and load functions
+
+TODO:
+    - optimise the connexions for the activation_function
+    - explicit fitness sharing
+    - unique id for eache connexion
+    - connexion dictionnary in the SpawingPool as a parameter for the shaping functiong
+      or attribute for the SP
+      Maybe put the NN shaping function directly inside the SP class ?
 """
 
 from copy import deepcopy
@@ -170,7 +178,7 @@ class SpawingPool:
         self.best_individual = None
         self.max_fitness = 0
 
-        self.latest_neuron_id = nb_input * nb_output - 1
+        self.latest_neuron_id = 1 + nb_input + nb_output
 
         self.poulation_size = poulation_size
         self.population = []
@@ -248,7 +256,18 @@ def newRecusiveConnexion(nn: NeuralNetwork, force_input=False):
             Connexion(neuron_id1, neuron_id2, 2 * random() - 1))
 
 
+def addNeuron(nn: Neuron):
+    """Adds a neuron on a pre-existing connexion:
+       o-o => o-o-o
+       Disables the old connexion"""
+
+    candidates = [c for c in nn.connexions if c.is_active]
+    connexion = choice(candidates)
+    connexion.disable
+
+
 # Service functions
+
 
 def save(obj, file_name='latest_NN'):
     """Saves an object"""
