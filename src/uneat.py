@@ -8,6 +8,8 @@ Connections
 """
 
 from copy import deepcopy
+from pickle import Pickler, Unpickler
+
 from random import random, choice
 from numpy import tanh
 
@@ -59,9 +61,10 @@ class Neuron:
 class NeuralNetwork:
     """A neural network which is a genome from the genetic algorithm point of view"""
 
-    def __init__(self, nb_input, nb_output):
-        self.nb_input = nb_input
+    def __init__(self, nb_input, nb_output, activation_funtion=tanh):
+        self.nb_input = 1 + nb_input  # Adding a bias node
         self.nb_output = nb_output
+        self.activation_funtion = activation_funtion
 
         self.neurons = {}
         self.connexions = []
@@ -69,12 +72,24 @@ class NeuralNetwork:
         # recursive connexion must be treated seprately
         self.recursive_connexions = []
 
+        self.neurons[0] = Neuron(0)
+        self.neurons[0].value = 1  # bias node always set to 1
+
+        # Connection all the input node to the output node
+        # Minimal strructure of the NN
+        for e in range(1, self.nb_input):
+            for i in range(self.nb_output):
+                self.connexions.append(Connexion(e, i, 1))
+
     def generate_netork(self):
         """generates the neural network using its connexion list
             O(|self.connexions|)"""
         self.neurons = {}
 
-        for e in range(self.nb_input):
+        self.neurons[0] = Neuron(0)
+        self.neurons[0].value = 1  # bias node always set to 1
+
+        for e in range(1, self.nb_input):
             self.neurons[e] = Neuron(e)
         for i in range(self.nb_input, self.nb_output):
             self.neurons[i] = Neuron(i)
@@ -95,28 +110,37 @@ class NeuralNetwork:
         """evaluates the neural network
            basically a depth first search
            O(|self.connexions|)"""
-        for i in range(self.nb_input):
+
+        # Setting the input values
+        self.neurons[0].value = 1  # Bias node
+
+        for i in range(1, self.nb_input):
             self.neurons[i].value = input_vector[i]
             self.neurons[i].already_evaluated = True
 
+        # Evaluating the NN
         res = [self.evaluate_neuron(o)
                for o in range(self.nb_input, self.nb_output)]
 
-        temp = {}  # stores the useful values for the recursive connexions
+        # Storing the useful values for the recursive connexions
+        temp = {}
         for c in self.recursive_connexions:
             temp[c.o] = self.neurons[c.i].value
 
+        # Reseting the network
         for neuron_id in self.neurons:  # Resets the network
             self.neurons[neuron_id].value = 0
             self.neurons[neuron_id].already_evaluated = False
 
-        for neuron_id in temp:  # Applies the recursive connexions
+         # Applying the recursive connexions
+        for neuron_id in temp:
             self.neurons[neuron_id].value = temp[neuron_id]
 
         return res
 
     def evaluate_neuron(self, neuron_id):
-        """Evaluates a neuron"""
+        """Recursive function that evaluates a neuron
+           By evluating its conexions"""
         # Should work because it would be a pointer the neuron
         # Needs to be tested though
         neuron = self.neurons[neuron_id]
@@ -127,7 +151,7 @@ class NeuralNetwork:
         for input_neuron_id in neuron.input_list:
             s += self.evaluate_neuron(input_neuron_id)
 
-        neuron.value = activation_funtion(s)
+        neuron.value = self.activation_funtion(s)
         neuron.already_evaluated = True
 
         return neuron.value
@@ -159,10 +183,6 @@ class SpawingPool:
 
 
 # FUNCTIONS
-
-def activation_funtion(x):
-    return tanh(x)
-
 
 # Shaping functions
 
@@ -229,3 +249,20 @@ def newRecusiveConnexion(nn: NeuralNetwork, force_input=False):
 
         nn.connexions.append(
             Connexion(neuron_id1, neuron_id2, 2 * random() - 1))
+
+
+# Service functions
+
+def save(obj, file_name='latest_NN'):
+    with open(file_name, 'wb') as file_:
+        pickler = Pickler(file_)
+        pickler.dump(obj)
+
+    print("Saved as ", file_name)
+
+
+def load(file_name='latest_NN'):
+    with open(file_name, 'rb') as file_:
+        unpickler = Unpickler(file_)
+        obj = unpickler.load()
+    return obj
