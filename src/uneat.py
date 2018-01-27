@@ -1,10 +1,10 @@
-""" TODO:
-2 step evaluation process:
-    -1 normal connexions
-    -2 recursives connexions
-
-Neurone € dictionnary
-Connections
+"""
+This module contains:
+    - 4 classes: Connexion, Neuron, NeuralNetwork, SpawingPool
+    - Shaping function that modify a neural network:
+        - newConnexion
+        - newRecursiveConnexion
+    - save and load functions
 """
 
 from copy import deepcopy
@@ -21,7 +21,7 @@ class Connexion:
 
     # pylint: disable=too-few-public-methods
     # Using dictionnaries here would a tiny bit more efficient
-    # but classes keeps the code homegeneous
+    # but classes keeps the code clean and homegeneous
 
     def __init__(self, i, o, w=0):
         """i is the ID of the input neuron
@@ -37,7 +37,7 @@ class Neuron:
 
     # pylint: disable=too-few-public-methods
     # Using dictionnaries here would a tiny bit more efficient
-    # but classes keeps the code homegeneous
+    # but classes keeps the code clean and homegeneous
 
     def __init__(self, id_, input_list=None):
         # List of the ID of the neurones that are connected to this one
