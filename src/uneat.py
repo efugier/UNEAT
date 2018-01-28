@@ -9,10 +9,12 @@ This module contains:
 TODO:
     - optimise the connexions for the activation_function
     - explicit fitness sharing
+        -https://pdfs.semanticscholar.org/b32f/71b58da453f60e63f97a1bc7ae2e717b4ea3.pdf
     - unique id for eache connexion
     - connexion dictionnary in the SpawingPool as a parameter for the shaping functiong
       or attribute for the SP
       Maybe put the NN shaping function directly inside the SP class ?
+    - Neuronid depends on the birth connexion
 """
 
 from copy import deepcopy
@@ -31,13 +33,19 @@ class Connexion:
     # Using dictionnaries here would a tiny bit more efficient
     # but classes keeps the code clean and homegeneous
 
-    def __init__(self, i, o, w=0):
+    def __init__(self, id_, i, o, w=0):
         """i is the ID of the input neuron
            o is the ID of the output neuron
            w is the weight of the connexion"""
+        self.id_ = id_
         self.i = i
         self.o = o
         self.w = w
+
+        # Allows to desactivate a connexion
+        # it is better to desactivate a connexion than removing it
+        # in order to keep track of the history of the evolution
+        self.is_active = True
 
 
 class Neuron:
@@ -60,11 +68,6 @@ class Neuron:
         # Important for the evaluation of the network
         self.already_evaluated = False
 
-        # Allows to desactivate a connexion
-        # it is better to desactivate a connexion than removing it
-        # in order to keep track of the history of the evolution
-        self.is_active = True
-
 
 class NeuralNetwork:
     """A neural network which is a genome from the genetic algorithm point of view"""
@@ -85,9 +88,11 @@ class NeuralNetwork:
 
         # Connection all the input node to the output node
         # Minimal strructure of the NN
-        for e in range(1, self.nb_input):
+        connexion_id = 0
+        for e in range(self.nb_input):
             for i in range(self.nb_output):
-                self.connexions.append(Connexion(e, i, 1))
+                self.connexions.append(Connexion(connexion_id, e, i, 1))
+                connexion_id += 1
 
     def generate_netork(self):
         """generates the neural network using its connexion list
@@ -178,7 +183,17 @@ class SpawingPool:
         self.best_individual = None
         self.max_fitness = 0
 
+        # The goal here is that 2 instances of the same neuron in 2 different NN
+        # should have the same id, same for the connexions
+
+        # neuron_catalog[i] contains the id of the neuron
+        # that the connexion of id i gave birth to
+        self.neuron_catalog = {}
         self.latest_neuron_id = 1 + nb_input + nb_output
+
+        # contains all the connexions that exist in every NN
+        self.connexion_catalog = {}
+        self.latest_connexion_id = (1 + nb_input) * nb_output
 
         self.poulation_size = poulation_size
         self.population = []
@@ -186,10 +201,96 @@ class SpawingPool:
 
         self.nouveaux_genes = []
 
+    def newConnexion(self, nn: NeuralNetwork, force_input=False):
+        """Creates a connexion between two unconnected neurons the feed forward way
+        force_input forces a connexion from one of the input nodes
+        O(|neurons|^2 + )"""
+
+        if force_input:
+            neuron_id1 = choice(range(nn.nb_input))
+            candidates = [id2 for id2 in nn.neurons
+                          if id2 != neuron_id1 and not neuron_id1 in nn.neurons[id2].input_list]
+            if candidates:
+                neuron_id2 = choice(candidates)
+                nn.connexions.append(
+                    Connexion(neuron_id1, neuron_id2, 2 * random() - 1))
+
+        else:
+            neuron_id2 = choice(nn.neurons.keys())
+            candidates = [id1 for id1 in nn.neurons
+                          if id1 != neuron_id2 and not id1 in nn.neurons[neuron_id2].input_list]
+
+            if candidates:
+                neuron_id1 = choice(candidates)
+
+                # Making sure the connexion is well oriented
+                if not isForward(neuron_id1, neuron_id2, nn.neurons):
+                    neuron_id1, neuron_id2 = neuron_id2, neuron_id1
+
+                # Checking if this connexion already exists
+                self.latest_connexion_id += 1
+                connexion = Connexion(self.latest_connexion_id,
+                                      neuron_id1, neuron_id2, 2 * random() - 1)
+                for c in self.connexion_catalog:
+                    if isSameConnexion(connexion, c):
+                        connexion.id_ = c.id_
+                        self.latest_connexion_id -= 1
+                        break
+                #/!\ add it to conn_catalog if normal ending of the loop
+
+                nn.connexions.append(connexion)
+
+    def newRecusiveConnexion(self, nn: NeuralNetwork, force_input=False):
+        """Creates a connexion between two unconnected neurons the recursive way
+        force_input forces a connexion to one of the input nodes
+        O(|neurons|*|recursive_connexions|)"""
+
+        if force_input:
+            neuron_id2 = choice(range(nn.nb_input))
+        else:
+            neuron_id2 = choice(nn.neurons.keys())
+
+        candidates = []
+        for id1 in nn.neurons:
+            for c in nn.recursive_connexions:
+                if not (c.i == id1 and c.o == neuron_id2):
+                    candidates.append(id1)
+
+        if candidates:
+            neuron_id1 = choice(candidates)
+
+            # Checking if this connexion already exists
+            self.latest_connexion_id += 1
+            connexion = Connexion(self.latest_connexion_id,
+                                  neuron_id1, neuron_id2, 2 * random() - 1)
+            for c in self.connexion_catalog:
+                if isSameConnexion(connexion, c):
+                    connexion.id_ = c.id_
+                    self.latest_connexion_id -= 1
+                    break
+
+            nn.connexions.append(connexion)
+
+
+def addNeuron(nn: NeuralNetwork):
+    """Adds a neuron on a pre-existing connexion:
+       o-o => o-o-o
+       Disables the old connexion"""
+
+    candidates = [c for c in nn.connexions if c.is_active]
+    connexion = choice(candidates)
+    connexion.is_active = False
+
 
 # FUNCTIONS
 
 # Shaping functions
+
+def isSameConnexion(c1, c2):
+    if c1.i == c2.i and c1.o == c2.o:
+        return True
+    return False
+
 
 def isForward(neuron_id1, neuron_id2, neurons):
     """Makes sure a feed forward connexion should go from id1 to id2
@@ -201,69 +302,6 @@ def isForward(neuron_id1, neuron_id2, neurons):
             return False
 
     return True
-
-
-def newConnexion(nn: NeuralNetwork, force_input=False):
-    """Creates a connexion between two unconnected neurons the feed forward way
-       force_input forces a connexion from one of the input nodes
-       O(|neurons|^2)"""
-
-    if force_input:
-        neuron_id1 = choice(range(nn.nb_input))
-        candidates = [id1 for id1 in nn.neurons
-                      if id1 != neuron_id1 and not neuron_id1 in nn.neurons[id1].input_list]
-        if candidates:
-            neuron_id2 = choice(candidates)
-            nn.connexions.append(
-                Connexion(neuron_id1, neuron_id2, 2 * random() - 1))
-
-    else:
-        neuron_id2 = choice(nn.neurons.keys())
-        candidates = [id1 for id1 in nn.neurons
-                      if id1 != neuron_id2 and not id1 in nn.neurons[neuron_id2].input_list]
-
-        if candidates:
-            neuron_id1 = choice(candidates)
-
-            # Making sure the connexion is well oriented
-            if not isForward(neuron_id1, neuron_id2, nn.neurons):
-                neuron_id1, neuron_id2 = neuron_id2, neuron_id1
-
-            nn.connexions.append(
-                Connexion(neuron_id1, neuron_id2, 2 * random() - 1))
-
-
-def newRecusiveConnexion(nn: NeuralNetwork, force_input=False):
-    """Creates a connexion between two unconnected neurons the recursive way
-       force_input forces a connexion to one of the input nodes
-       O(|neurons|*|recursive_connexions|)"""
-
-    if force_input:
-        neuron_id2 = choice(range(nn.nb_input))
-    else:
-        neuron_id2 = choice(nn.neurons.keys())
-
-    candidates = []
-    for id1 in nn.neurons:
-        for c in nn.recursive_connexions:
-            if not (c.i == id1 and c.o == neuron_id2):
-                candidates.append(id1)
-
-    if candidates:
-        neuron_id1 = choice(candidates)
-
-        nn.connexions.append(
-            Connexion(neuron_id1, neuron_id2, 2 * random() - 1))
-
-
-def addNeuron(nn: Neuron):
-    """Adds a neuron on a pre-existing connexion:
-       o-o => o-o-o
-       Disables the old connexion"""
-
-    candidates = [c for c in nn.connexions if c.is_active]
-    connexion = choice(candidates)
-    connexion.disable
 
 
 # Service functions
