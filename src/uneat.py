@@ -195,6 +195,9 @@ class SpawingPool:
         self.connexion_catalog = {}
         self.latest_connexion_id = (1 + nb_input) * nb_output
 
+        self.recursive_connexion_catalog = {}
+        self.latest_recursive_connexion_id = -1
+
         self.poulation_size = poulation_size
         self.population = []
         self.species = []
@@ -212,8 +215,7 @@ class SpawingPool:
                           if id2 != neuron_id1 and not neuron_id1 in nn.neurons[id2].input_list]
             if candidates:
                 neuron_id2 = choice(candidates)
-                nn.connexions.append(
-                    Connexion(neuron_id1, neuron_id2, 2 * random() - 1))
+                # No need to check if the connexion is well-oriented
 
         else:
             neuron_id2 = choice(nn.neurons.keys())
@@ -227,18 +229,20 @@ class SpawingPool:
                 if not isForward(neuron_id1, neuron_id2, nn.neurons):
                     neuron_id1, neuron_id2 = neuron_id2, neuron_id1
 
-                # Checking if this connexion already exists
+        if candidates:
+            # Checking if this connexion already exists
+            connexion = Connexion(-1, neuron_id1,
+                                  neuron_id2, 2 * random() - 1)
+            for c in self.connexion_catalog:
+                if isSameConnexion(connexion, c):
+                    connexion.id_ = c.id_
+                    break
+            else:
                 self.latest_connexion_id += 1
-                connexion = Connexion(self.latest_connexion_id,
-                                      neuron_id1, neuron_id2, 2 * random() - 1)
-                for c in self.connexion_catalog:
-                    if isSameConnexion(connexion, c):
-                        connexion.id_ = c.id_
-                        self.latest_connexion_id -= 1
-                        break
-                #/!\ add it to conn_catalog if normal ending of the loop
+                connexion.id_ = self.latest_connexion_id
+                self.connexion_catalog[connexion.id_] = connexion
 
-                nn.connexions.append(connexion)
+            nn.connexions.append(connexion)
 
     def newRecusiveConnexion(self, nn: NeuralNetwork, force_input=False):
         """Creates a connexion between two unconnected neurons the recursive way
@@ -260,16 +264,18 @@ class SpawingPool:
             neuron_id1 = choice(candidates)
 
             # Checking if this connexion already exists
-            self.latest_connexion_id += 1
-            connexion = Connexion(self.latest_connexion_id,
-                                  neuron_id1, neuron_id2, 2 * random() - 1)
-            for c in self.connexion_catalog:
+            connexion = Connexion(-1, neuron_id1,
+                                  neuron_id2, 2 * random() - 1)
+            for c in self.recursive_connexion_catalog:
                 if isSameConnexion(connexion, c):
                     connexion.id_ = c.id_
-                    self.latest_connexion_id -= 1
                     break
+            else:
+                self.latest_recursive_connexion_id += 1
+                connexion.id_ = self.latest_recursive_connexion_id
+                self.recursive_connexion_catalog[connexion.id_] = connexion
 
-            nn.connexions.append(connexion)
+            nn.recursive_connexions.append(connexion)
 
 
 def addNeuron(nn: NeuralNetwork):
