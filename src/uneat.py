@@ -323,7 +323,7 @@ class SpawingPool:
 # Shaping functions
 
 
-def isSameConnexion(c1, c2):
+def isSameConnexion(c1: Connexion, c2: Connexion):
     if c1.i == c2.i and c1.o == c2.o:
         return True
     return False
