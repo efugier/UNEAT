@@ -10,11 +10,6 @@ TODO:
     - optimise the connexions for the activation_function
     - explicit fitness sharing
         -https://pdfs.semanticscholar.org/b32f/71b58da453f60e63f97a1bc7ae2e717b4ea3.pdf
-    - unique id for eache connexion
-    - connexion dictionnary in the SpawingPool as a parameter for the shaping functiong
-      or attribute for the SP
-      Maybe put the NN shaping function directly inside the SP class ?
-    - Neuronid depends on the birth connexion
 """
 
 from copy import deepcopy
@@ -107,8 +102,7 @@ class NeuralNetwork:
         for i in range(self.nb_input, self.nb_output):
             self.neurons[i]=Neuron(i)
 
-        for id_ in self.connexions:
-            c=self.connexions[id_]
+        for c in self.connexions.values():
             if c.is_active:
                 # Checking the existence of the neurons
                 if not c.i in self.neurons:  # O(1)
@@ -214,8 +208,7 @@ class SpawingPool:
         """checks if the connexion already exists on in another
            induvidual and updates the ids accrodingly
            O(|connexion_catalog|)"""
-        for id_ in self.connexion_catalog:
-            c = self.connexion_catalog[id_]
+        for c in self.connexion_catalog.values():
             if isSameConnexion(connexion, c):
                 connexion.id_ = c.id_
                 break
@@ -296,7 +289,7 @@ class SpawingPool:
         Disables the old connexion
         O(|connexions|)"""
 
-        candidates = [nn.connexions[id_] for id_ in nn.connexions if nn.connexions[id_].is_active]
+        candidates = [c for c in nn.connexions.values if c.is_active]
         connexion = choice(candidates)
         connexion.is_active = False
 
