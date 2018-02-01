@@ -204,10 +204,12 @@ class SpawingPool:
 
         self.nouveaux_genes = []
 
-    def checkExistance(self, connexion):
+    def setConnexionId(self, connexion):
         """checks if the connexion already exists on in another
-           induvidual and updates the ids accrodingly"""
-            for c in self.connexion_catalog:
+           induvidual and updates the ids accrodingly
+           O(|connexion_catalog|)"""
+            for id_ in self.connexion_catalog:
+                c = self.connexion_catalog[id_]
                 if isSameConnexion(connexion, c):
                     connexion.id_ = c.id_
                     break
@@ -219,7 +221,7 @@ class SpawingPool:
     def newConnexion(self, nn: NeuralNetwork, force_input=False):
         """Creates a connexion between two unconnected neurons the feed forward way
         force_input forces a connexion from one of the input nodes
-        O(|neurons|^2 + )"""
+        O(|neurons|^2 + |connexions|)"""
 
         if force_input:
             neuron_id1 = choice(range(nn.nb_input))
@@ -246,13 +248,13 @@ class SpawingPool:
             connexion = Connexion(-1, neuron_id1,
                                   neuron_id2, 2 * random() - 1)
 
-            self.checkExistance(connexion)
+            self.setConnexionId(connexion)
             nn.connexions.append(connexion)
 
     def newRecusiveConnexion(self, nn: NeuralNetwork, force_input=False):
         """Creates a connexion between two unconnected neurons the recursive way
         force_input forces a connexion to one of the input nodes
-        O(|neurons|*|recursive_connexions|)"""
+        O(|neurons| + |recursive_connexions| + |recursive_connexion_catalog|)"""
 
         if force_input:
             neuron_id2 = choice(range(nn.nb_input))
@@ -285,7 +287,8 @@ class SpawingPool:
     def addNeuron(self, nn: NeuralNetwork):
         """Adds a neuron on a pre-existing connexion:
         o-o => o-o-o
-        Disables the old connexion"""
+        Disables the old connexion
+        O(|connexions|)"""
 
         candidates = [c for c in nn.connexions if c.is_active]
         connexion = choice(candidates)
@@ -308,8 +311,8 @@ class SpawingPool:
         new_connexion2 = Connexion(-1, new_neuron_id,
                                    connexion.o, 2 * random() - 1)
 
-        self.checkExistance(new_connexion1)
-        self.checkExistance(new_connexion2)
+        self.setConnexionId(new_connexion1)
+        self.setConnexionId(new_connexion2)
 
         nn.connexions.append(new_connexion1)
         nn.connexions.append(new_connexion2)
