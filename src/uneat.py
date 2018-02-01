@@ -86,29 +86,30 @@ class NeuralNetwork:
         connexion_id = 0
         for e in range(self.nb_input):
             for i in range(self.nb_output):
-                self.connexions[connexion_id] = Connexion(connexion_id, e, i, 1))
+                self.connexions[connexion_id] = Connexion(
+                    connexion_id, e, i, 1)
                 connexion_id += 1
 
     def generate_netork(self):
         """generates the neural network using its connexion list
             O(|self.connexions|)"""
-        self.neurons={}
+        self.neurons = {}
 
-        self.neurons[0]=Neuron(0)
-        self.neurons[0].value=1  # bias node always set to 1
+        self.neurons[0] = Neuron(0)
+        self.neurons[0].value = 1  # bias node always set to 1
 
         for e in range(1, self.nb_input):
-            self.neurons[e]=Neuron(e)
+            self.neurons[e] = Neuron(e)
         for i in range(self.nb_input, self.nb_output):
-            self.neurons[i]=Neuron(i)
+            self.neurons[i] = Neuron(i)
 
         for c in self.connexions.values():
             if c.is_active:
                 # Checking the existence of the neurons
                 if not c.i in self.neurons:  # O(1)
-                    self.neurons[c.i]=Neuron(c.i)
+                    self.neurons[c.i] = Neuron(c.i)
                 if not c.o in self.neurons:
-                    self.neurons[c.o]=Neuron(c.o)
+                    self.neurons[c.o] = Neuron(c.o)
 
                 # Connecting the neurons
                 if not c.i in self.neurons[c.o].input_list:
@@ -120,13 +121,13 @@ class NeuralNetwork:
            O(|self.connexions|)"""
 
         # Setting the input values
-        self.neurons[0].value=1  # Bias node
+        self.neurons[0].value = 1  # Bias node
         for i in range(1, self.nb_input):
-            self.neurons[i].value=input_vector[i]
-            self.neurons[i].already_evaluated=True
+            self.neurons[i].value = input_vector[i]
+            self.neurons[i].already_evaluated = True
 
         # Evaluating the NN
-        res=[self.evaluate_neuron(o)
+        res = [self.evaluate_neuron(o)
                for o in range(self.nb_input, self.nb_output)]
 
         # Storing the values that are useful for the recursive connexions
@@ -344,7 +345,7 @@ def isForward(neuron_id1, neuron_id2, neurons: dict):
 
 def distance(nn1: NeuralNetwork, nn2: NeuralNetwork):
     connexion_catalog = {}
-    
+
 
 # Service functions
 
