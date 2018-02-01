@@ -78,10 +78,10 @@ class NeuralNetwork:
         self.activation_funtion = activation_funtion
 
         self.neurons = {}
-        self.connexions = []
+        self.connexions = {}
 
         # recursive connexion must be treated seprately
-        self.recursive_connexions = []
+        self.recursive_connexions = {}
 
         self.neurons[0] = Neuron(0)
         self.neurons[0].value = 1  # bias node always set to 1
@@ -91,31 +91,32 @@ class NeuralNetwork:
         connexion_id = 0
         for e in range(self.nb_input):
             for i in range(self.nb_output):
-                self.connexions.append(Connexion(connexion_id, e, i, 1))
+                self.connexions[connexion_id] = Connexion(connexion_id, e, i, 1))
                 connexion_id += 1
 
     def generate_netork(self):
         """generates the neural network using its connexion list
             O(|self.connexions|)"""
-        self.neurons = {}
+        self.neurons={}
 
-        self.neurons[0] = Neuron(0)
-        self.neurons[0].value = 1  # bias node always set to 1
+        self.neurons[0]=Neuron(0)
+        self.neurons[0].value=1  # bias node always set to 1
 
         for e in range(1, self.nb_input):
-            self.neurons[e] = Neuron(e)
+            self.neurons[e]=Neuron(e)
         for i in range(self.nb_input, self.nb_output):
-            self.neurons[i] = Neuron(i)
+            self.neurons[i]=Neuron(i)
 
-        for c in self.connexions:
+        for id_ in self.connexions:
+            c=self.connexions[id_]
             if c.is_active:
                 # Checking the existence of the neurons
                 if not c.i in self.neurons:  # O(1)
-                    self.neurons[c.i] = Neuron(c.i)
+                    self.neurons[c.i]=Neuron(c.i)
                 if not c.o in self.neurons:
-                    self.neurons[c.o] = Neuron(c.o)
+                    self.neurons[c.o]=Neuron(c.o)
 
-                # Connexion
+                # Connecting the neurons
                 if not c.i in self.neurons[c.o].input_list:
                     self.neurons[c.o].input_list.append(c.i)
 
@@ -125,18 +126,18 @@ class NeuralNetwork:
            O(|self.connexions|)"""
 
         # Setting the input values
-        self.neurons[0].value = 1  # Bias node
+        self.neurons[0].value=1  # Bias node
         for i in range(1, self.nb_input):
-            self.neurons[i].value = input_vector[i]
-            self.neurons[i].already_evaluated = True
+            self.neurons[i].value=input_vector[i]
+            self.neurons[i].already_evaluated=True
 
         # Evaluating the NN
-        res = [self.evaluate_neuron(o)
+        res=[self.evaluate_neuron(o)
                for o in range(self.nb_input, self.nb_output)]
 
         # Storing the values that are useful for the recursive connexions
         temp = {}
-        for c in self.recursive_connexions:
+        for c in self.recursive_connexions.values():
             temp[c.o] = self.neurons[c.i].value
 
         # Reseting the network
@@ -173,10 +174,15 @@ class SpawingPool:
     # pylint: disable=too-many-instance-attributes
     # This class' very purpose is to encapsulate the evolution's variables
 
-    def __init__(self, nb_input=2, nb_output=1, poulation_size=150, max_nb_neurons=30):
+    def __init__(self, nb_input=2, nb_output=1, poulation_size=150, max_nb_neurons=30,
+                 evaluation_function=None):
         self.nb_input = nb_input
         self.nb_output = nb_output
         self.max_nb_neurons = max_nb_neurons
+
+        # A function that can evalutate a LIST of neural network
+        # and return a LIST of fitness in the SAME ORDER
+        self.evaluation_function = evaluation_function
 
         self.generation_nb = 0
 
@@ -204,19 +210,19 @@ class SpawingPool:
 
         self.nouveaux_genes = []
 
-    def setConnexionId(self, connexion):
+    def setConnexionId(self, connexion: Connexion):
         """checks if the connexion already exists on in another
            induvidual and updates the ids accrodingly
            O(|connexion_catalog|)"""
-            for id_ in self.connexion_catalog:
-                c = self.connexion_catalog[id_]
-                if isSameConnexion(connexion, c):
-                    connexion.id_ = c.id_
-                    break
-            else:
-                self.latest_connexion_id += 1
-                connexion.id_ = self.latest_connexion_id
-                self.connexion_catalog[connexion.id_] = connexion
+        for id_ in self.connexion_catalog:
+            c = self.connexion_catalog[id_]
+            if isSameConnexion(connexion, c):
+                connexion.id_ = c.id_
+                break
+        else:
+            self.latest_connexion_id += 1
+            connexion.id_ = self.latest_connexion_id
+            self.connexion_catalog[connexion.id_] = connexion
 
     def newConnexion(self, nn: NeuralNetwork, force_input=False):
         """Creates a connexion between two unconnected neurons the feed forward way
@@ -249,7 +255,7 @@ class SpawingPool:
                                   neuron_id2, 2 * random() - 1)
 
             self.setConnexionId(connexion)
-            nn.connexions.append(connexion)
+            nn.connexions[connexion.id_] = connexion
 
     def newRecusiveConnexion(self, nn: NeuralNetwork, force_input=False):
         """Creates a connexion between two unconnected neurons the recursive way
@@ -263,7 +269,7 @@ class SpawingPool:
 
         candidates = []
         for id1 in nn.neurons:
-            for c in nn.recursive_connexions:
+            for c in nn.recursive_connexions.values():
                 if not (c.i == id1 and c.o == neuron_id2):
                     candidates.append(id1)
 
@@ -282,7 +288,7 @@ class SpawingPool:
                 connexion.id_ = self.latest_recursive_connexion_id
                 self.recursive_connexion_catalog[connexion.id_] = connexion
 
-            nn.recursive_connexions.append(connexion)
+            nn.recursive_connexions[connexion.id_] = connexion
 
     def addNeuron(self, nn: NeuralNetwork):
         """Adds a neuron on a pre-existing connexion:
@@ -290,7 +296,7 @@ class SpawingPool:
         Disables the old connexion
         O(|connexions|)"""
 
-        candidates = [c for c in nn.connexions if c.is_active]
+        candidates = [nn.connexions[id_] for id_ in nn.connexions if nn.connexions[id_].is_active]
         connexion = choice(candidates)
         connexion.is_active = False
 
@@ -314,8 +320,8 @@ class SpawingPool:
         self.setConnexionId(new_connexion1)
         self.setConnexionId(new_connexion2)
 
-        nn.connexions.append(new_connexion1)
-        nn.connexions.append(new_connexion2)
+        nn.connexions[new_connexion1.id_] = new_connexion1
+        nn.connexions[new_connexion2.id_] = new_connexion2
 
 
 # FUNCTIONS
@@ -329,7 +335,7 @@ def isSameConnexion(c1, c2):
     return False
 
 
-def isForward(neuron_id1, neuron_id2, neurons):
+def isForward(neuron_id1, neuron_id2, neurons: dict):
     """Makes sure a feed forward connexion should go from id1 to id2
        return True if yes, False if no
        O(|connexions|)"""
@@ -340,6 +346,12 @@ def isForward(neuron_id1, neuron_id2, neurons):
 
     return True
 
+
+# Genetic function
+
+def distance(nn1: NeuralNetwork, nn2: NeuralNetwork):
+    connexion_catalog = {}
+    
 
 # Service functions
 
