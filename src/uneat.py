@@ -345,6 +345,7 @@ def isForward(neuron_id1, neuron_id2, neurons: dict):
 
 def distance(nn1: NeuralNetwork, nn2: NeuralNetwork):
     connexion_catalog = {}
+    pass
 
 
 # Service functions
