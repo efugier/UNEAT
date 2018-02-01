@@ -204,6 +204,18 @@ class SpawingPool:
 
         self.nouveaux_genes = []
 
+    def checkExistance(self, connexion):
+        """checks if the connexion already exists on in another
+           induvidual and updates the ids accrodingly"""
+            for c in self.connexion_catalog:
+                if isSameConnexion(connexion, c):
+                    connexion.id_ = c.id_
+                    break
+            else:
+                self.latest_connexion_id += 1
+                connexion.id_ = self.latest_connexion_id
+                self.connexion_catalog[connexion.id_] = connexion
+
     def newConnexion(self, nn: NeuralNetwork, force_input=False):
         """Creates a connexion between two unconnected neurons the feed forward way
         force_input forces a connexion from one of the input nodes
@@ -233,15 +245,8 @@ class SpawingPool:
             # Checking if this connexion already exists
             connexion = Connexion(-1, neuron_id1,
                                   neuron_id2, 2 * random() - 1)
-            for c in self.connexion_catalog:
-                if isSameConnexion(connexion, c):
-                    connexion.id_ = c.id_
-                    break
-            else:
-                self.latest_connexion_id += 1
-                connexion.id_ = self.latest_connexion_id
-                self.connexion_catalog[connexion.id_] = connexion
 
+            self.checkExistance(connexion)
             nn.connexions.append(connexion)
 
     def newRecusiveConnexion(self, nn: NeuralNetwork, force_input=False):
@@ -277,20 +282,43 @@ class SpawingPool:
 
             nn.recursive_connexions.append(connexion)
 
+    def addNeuron(self, nn: NeuralNetwork):
+        """Adds a neuron on a pre-existing connexion:
+        o-o => o-o-o
+        Disables the old connexion"""
 
-def addNeuron(nn: NeuralNetwork):
-    """Adds a neuron on a pre-existing connexion:
-       o-o => o-o-o
-       Disables the old connexion"""
+        candidates = [c for c in nn.connexions if c.is_active]
+        connexion = choice(candidates)
+        connexion.is_active = False
 
-    candidates = [c for c in nn.connexions if c.is_active]
-    connexion = choice(candidates)
-    connexion.is_active = False
+        new_neuron_id = -1
+
+        # If that connexion already gave birth to a neuron
+        if connexion.id_ in self.neuron_catalog:
+            new_neuron_id = self.neuron_catalog[connexion.id_]
+        else:
+            self.latest_neuron_id += 1
+            new_neuron_id = self.latest_neuron_id
+
+            # Updating the catalog
+            self.neuron_catalog[connexion.id_] = new_neuron_id
+
+        new_connexion1 = Connexion(-1, connexion.i,
+                                   new_neuron_id, 2 * random() - 1)
+        new_connexion2 = Connexion(-1, new_neuron_id,
+                                   connexion.o, 2 * random() - 1)
+
+        self.checkExistance(new_connexion1)
+        self.checkExistance(new_connexion2)
+
+        nn.connexions.append(new_connexion1)
+        nn.connexions.append(new_connexion2)
 
 
 # FUNCTIONS
 
 # Shaping functions
+
 
 def isSameConnexion(c1, c2):
     if c1.i == c2.i and c1.o == c2.o:
