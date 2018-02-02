@@ -325,7 +325,8 @@ class SpawingPool:
         nn.connexions[new_connexion2.id_] = new_connexion2
 
     def buildDistanceMatrix(self):
-        """Calculates the distance matrix for the current population"""
+        """Calculates the distance matrix for the current population
+           O(|population|^2 * (|connexion_catalog| + |recursive_connexion_catalog|)"""
 
         distance_matrix = [[0] * len(self.population)
                            for _ in range(len(self.population))]
@@ -336,6 +337,7 @@ class SpawingPool:
 
     def distance(self, nn1, nn2):
         """calculates the distance between two neural networks
+           (can be optimize to O(|nn.connexions| + |recursive_connexion_catalog|))
            O(|connexion_catalog| + |recursive_connexion_catalog|)"""
         disjoint_genes_count = 0
         recursive_disjoint_genes_count = 0
