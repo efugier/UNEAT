@@ -67,13 +67,15 @@ class Neuron:
 class NeuralNetwork:
     """A neural network which is a genome from the genetic algorithm point of view"""
 
-    def __init__(self, nb_input, nb_output, activation_funtion=tanh):
+    def __init__(self, id_, nb_input, nb_output, activation_funtion=tanh):
         self.nb_input = 1 + nb_input  # Adding a bias node
         self.nb_output = nb_output
         self.activation_funtion = activation_funtion
 
         self.neurons = {}
         self.connexions = {}
+
+        self.id_ = id_
 
         # recursive connexion must be treated seprately
         self.recursive_connexions = {}
@@ -199,6 +201,11 @@ class SpawingPool:
         self.recursive_connexion_catalog = {}
         self.latest_recursive_connexion_id = -1
 
+        # coefficients for the distance calculation
+        self.disjoint_coeff = 1
+        self.recursive_disjoint_coeff = 1
+        self.weight_average_coeff = 1
+
         self.poulation_size = poulation_size
         self.population = []
         self.species = []
@@ -317,6 +324,64 @@ class SpawingPool:
         nn.connexions[new_connexion1.id_] = new_connexion1
         nn.connexions[new_connexion2.id_] = new_connexion2
 
+    def buildDistanceMatrix(self):
+        """Calculates the distance matrix for the current population"""
+
+        distance_matrix = [[0] * len(self.population)
+                           for _ in range(len(self.population))]
+
+        for nn1 in self.population:
+            for nn2 in self.population:
+                distance_matrix[nn1.id_][nn2.id_] = self.distance(nn1, nn2)
+
+    def distance(self, nn1, nn2):
+        """calculates the distance between two neural networks
+           O(|connexion_catalog| + |recursive_connexion_catalog|)"""
+        disjoint_genes_count = 0
+        recursive_disjoint_genes_count = 0
+        common_gene_count = 0
+        average_weight_difference = 0
+
+        # Normal connexions
+        for id_ in self.connexion_catalog:
+            if id_ in nn1.connexions:
+                if id_ in nn2.connexions:
+                    average_weight_difference += abs(nn1.connexions[id_] -
+                                                     nn2.connexions[id_])
+                    common_gene_count += 1
+                else:
+                    disjoint_genes_count += 1
+
+            elif id_ in nn2.connexions:
+                disjoint_genes_count += 1
+
+        # Recursive connexions
+        for id_ in self.recursive_connexion_catalog:
+            if id_ in nn1.recursive_connexions:
+                if id_ in nn2.recursive_connexions:
+                    average_weight_difference += abs(nn1.connexions[id_] -
+                                                     nn2.connexions[id_])
+                    common_gene_count += 1
+                else:
+                    recursive_disjoint_genes_count += 1
+
+            elif id_ in nn2.connexions:
+                recursive_disjoint_genes_count += 1
+
+        # Distance calculation
+        n = max(1, len(nn1.connexions), len(nn2.connexions))
+        n_rec = max(1, len(nn1.recursive_connexions),
+                    len(nn2.recursive_connexions))
+        disjoint = disjoint_genes_count / n
+        recursive_disjoint = recursive_disjoint_genes_count / n_rec
+        average_weight_difference /= common_gene_count
+
+        distance = self.disjoint_coeff * disjoint + \
+            self.recursive_disjoint_coeff * recursive_disjoint + \
+            self.weight_average_coeff * average_weight_difference
+
+        return distance
+
 
 # FUNCTIONS
 
@@ -342,10 +407,6 @@ def isForward(neuron_id1, neuron_id2, neurons: dict):
 
 
 # Genetic function
-
-def distance(nn1: NeuralNetwork, nn2: NeuralNetwork):
-    connexion_catalog = {}
-    pass
 
 
 # Service functions
