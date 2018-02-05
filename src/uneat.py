@@ -206,12 +206,18 @@ class SpawingPool:
         self.recursive_disjoint_coeff = 1
         self.weight_average_coeff = 1
 
+        self.same_species_threshold = 3
+
         self.poulation_size = poulation_size
-        self.population = {}
+        self.population = []
+
+        # Species are lists of individuals
+        self.species = []
 
         # Genetic Algorithm parameters
-        self.pop_renewal_rate = 0.5
-        self.crossover_rate = 1
+        self.crossover_rate = 0.75
+
+        self.elimination_rate = 0.1
 
         self.mutation_proba = 0.8
         self.uniform_perturbation_proba = 0.9
@@ -338,9 +344,17 @@ class SpawingPool:
         distance_matrix = [[0] * len(self.population)
                            for _ in range(len(self.population))]
 
-        for nn1 in self.population:
-            for nn2 in self.population:
-                distance_matrix[nn1.id_][nn2.id_] = self.distance(nn1, nn2)
+        i = 0
+        while i < self.poulation_size:
+            j = 0
+            while j < i:  # no need to do i=j (=> d = 0)
+                d = self.distance(self.population[i], self.population[j])
+                distance_matrix[i][j] = d
+                distance_matrix[j][i] = d
+                j += 1
+            i += 1
+
+        return distance_matrix
 
     def distance(self, nn1, nn2):
         """calculates the distance between two neural networks
@@ -392,12 +406,27 @@ class SpawingPool:
         return distance
 
     def initPopulation(self):
+        self.population = [0] * self.poulation_size
         for id_ in range(self.poulation_size):
             self.population[id_] = NeuralNetwork(
                 id_, self.nb_input, self.nb_output)
 
-    def getWeakestId(self):
-        for
+    def newGeneration(self):
+        # calculation of the distance matrix
+        distance_matrix = self.buildDistanceMatrix()
+
+        # creation of the species
+        self.species = []
+        for id_ in range(self.poulation_size):
+            for sp in self.species:
+                representative_id = sp[0]
+                if distance_matrix[id_][representative_id] < self.same_species_threshold:
+                    sp.append(id_)
+                    break
+            else:
+                self.species.append([id_])
+
+        #
 
 
 # FUNCTIONS
