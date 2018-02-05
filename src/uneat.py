@@ -207,10 +207,17 @@ class SpawingPool:
         self.weight_average_coeff = 1
 
         self.poulation_size = poulation_size
-        self.population = []
-        self.species = []
+        self.population = {}
 
-        self.nouveaux_genes = []
+        # Genetic Algorithm parameters
+        self.pop_renewal_rate = 0.5
+        self.crossover_rate = 1
+
+        self.mutation_proba = 0.8
+        self.uniform_perturbation_proba = 0.9
+
+        self.new_connexion_proba = 0.05
+        self.new_neuron_proba = 0.03  # 0.3 if larger population
 
     def setConnexionId(self, connexion: Connexion):
         """checks if the connexion already exists on in another
@@ -383,6 +390,14 @@ class SpawingPool:
             self.weight_average_coeff * average_weight_difference
 
         return distance
+
+    def initPopulation(self):
+        for id_ in range(self.poulation_size):
+            self.population[id_] = NeuralNetwork(
+                id_, self.nb_input, self.nb_output)
+
+    def getWeakestId(self):
+        for
 
 
 # FUNCTIONS
