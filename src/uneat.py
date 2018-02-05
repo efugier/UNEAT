@@ -16,7 +16,8 @@ from copy import deepcopy
 from pickle import Pickler, Unpickler
 
 from random import random, choice
-from numpy import tanh
+from numpy import tanh, exp
+from numpy.random import normal
 
 
 # CLASSES
@@ -76,6 +77,8 @@ class NeuralNetwork:
         self.connexions = {}
 
         self.id_ = id_
+
+        self.fitness = 0
 
         # recursive connexion must be treated seprately
         self.recursive_connexions = {}
@@ -171,7 +174,7 @@ class SpawingPool:
     # pylint: disable=too-many-instance-attributes
     # This class' very purpose is to encapsulate the evolution's variables
 
-    def __init__(self, nb_input=2, nb_output=1, poulation_size=150, max_nb_neurons=30,
+    def __init__(self, nb_input=2, nb_output=1, population_size=150, max_nb_neurons=30,
                  evaluation_function=None):
         self.nb_input = nb_input
         self.nb_output = nb_output
@@ -208,7 +211,10 @@ class SpawingPool:
 
         self.same_species_threshold = 3
 
-        self.poulation_size = poulation_size
+        self.squaring_factor = 1
+        self.scaling_factor = 1
+
+        self.population_size = population_size
         self.population = []
 
         # Species are lists of individuals
@@ -217,12 +223,15 @@ class SpawingPool:
         # Genetic Algorithm parameters
         self.crossover_rate = 0.75
 
-        self.elimination_rate = 0.1
+        self.elimination_rate = 0.4
 
-        self.mutation_proba = 0.8
+        self.weight_mutation_proba = 0.8
         self.uniform_perturbation_proba = 0.9
 
         self.new_connexion_proba = 0.05
+        self.new_recursive_connexion_proba = 0
+        self.force_input_proba = 0.1
+
         self.new_neuron_proba = 0.03  # 0.3 if larger population
 
     def setConnexionId(self, connexion: Connexion):
@@ -271,7 +280,7 @@ class SpawingPool:
             self.setConnexionId(connexion)
             nn.connexions[connexion.id_] = connexion
 
-    def newRecusiveConnexion(self, nn: NeuralNetwork, force_input=False):
+    def newRecursiveConnexion(self, nn: NeuralNetwork, force_input=False):
         """Creates a connexion between two unconnected neurons the recursive way
         force_input forces a connexion to one of the input nodes
         O(|neurons| + |recursive_connexions| + |recursive_connexion_catalog|)"""
@@ -337,6 +346,62 @@ class SpawingPool:
         nn.connexions[new_connexion1.id_] = new_connexion1
         nn.connexions[new_connexion2.id_] = new_connexion2
 
+    def mutate(self, nn: NeuralNetwork):
+        # mutate weights
+        if random() < self.weight_mutation_proba:
+            for c in nn.connexions:
+                if random() < self.uniform_perturbation_proba:
+                    r = normal(c.weight)
+                    # r = min(1, max(-1, r))
+                    c.weight = r
+                else:
+                    c.weight = 2 * random() - 1
+
+        # mutate add connexion
+        if random() < self.new_connexion_proba:
+            if random() < self.force_input_proba:
+                self.newConnexion(nn, True)
+            else:
+                self.newConnexion(nn, False)
+
+        if random() < self.new_recursive_connexion_proba:
+            if random() < self.force_input_proba:
+                self.newRecursiveConnexion(nn, True)
+            else:
+                self.newRecursiveConnexion(nn, False)
+
+        # mutate add neuron
+        if random() < self.new_neuron_proba:
+            self.addNeuron(nn)
+
+    def mate(self, id_, sp, weak_ids=None):
+        if not weak_ids:
+            weak_ids = []
+
+        id1 = choice(sp)
+        candidates = [id2 for id2 in sp if id2 != id1]
+        id2 = choice(candidates)
+
+        # id1 is always the most fit nn
+        if self.population[id1].fitness < self.population[id2].fitness:
+            id1, id2 = id2, id1
+
+        nn1, nn2 = self.population[id1], self.population[id2]
+        new_nn = NeuralNetwork(id_, self.nb_input, self.nb_output)
+
+        for id_ in self.connexion_catalog:
+            if id_ in nn1.connexions and id_ in nn2.connexions:
+                if random() < 0.5:
+                    new_nn.connexions[id_] = deepcopy(nn1.connexions[id_])
+                else:
+                    new_nn.connexions[id_] = deepcopy(nn2.connexions[id_])
+
+            # Inheriting dijoints genes from the most fit parent
+            elif id_ in nn1.connexions:
+                new_nn.connexions[id_] = deepcopy(nn1.connexions[id_])
+
+        return new_nn
+
     def buildDistanceMatrix(self):
         """Calculates the distance matrix for the current population
            O(|population|^2 * (|connexion_catalog| + |recursive_connexion_catalog|)"""
@@ -345,7 +410,7 @@ class SpawingPool:
                            for _ in range(len(self.population))]
 
         i = 0
-        while i < self.poulation_size:
+        while i < self.population_size:
             j = 0
             while j < i:  # no need to do i=j (=> d = 0)
                 d = self.distance(self.population[i], self.population[j])
@@ -406,10 +471,17 @@ class SpawingPool:
         return distance
 
     def initPopulation(self):
-        self.population = [0] * self.poulation_size
-        for id_ in range(self.poulation_size):
+        self.population = [0] * self.population_size
+        for id_ in range(self.population_size):
             self.population[id_] = NeuralNetwork(
                 id_, self.nb_input, self.nb_output)
+
+    def sharingFunction(self, id1, id2, distance_matrix):
+        d = distance_matrix[id1][id2]
+        if d < self.same_species_threshold:
+            return 1 - (d / self.same_species_threshold) ** self.squaring_factor
+        else:
+            return 0
 
     def newGeneration(self):
         # calculation of the distance matrix
@@ -417,7 +489,7 @@ class SpawingPool:
 
         # creation of the species
         self.species = []
-        for id_ in range(self.poulation_size):
+        for id_ in range(self.population_size):
             for sp in self.species:
                 representative_id = sp[0]
                 if distance_matrix[id_][representative_id] < self.same_species_threshold:
@@ -426,10 +498,56 @@ class SpawingPool:
             else:
                 self.species.append([id_])
 
-        #
+        # evaluation of the individuals using fitness sharing
+        for sp in self.species:
+            raw_fitness_list = self.evaluation_function(sp)
+            for i, nn in enumerate(sp):  # fitness of the nn
+                # raw fitness
+                f = raw_fitness_list[i]
+
+                # niche count
+                m = sum([self.sharingFunction(nn.id_, j, distance_matrix)
+                         for j in range(self.population_size)])
+
+                # shared fitness
+                shared_fitness = (f ** self.scaling_factor) / m
+
+                nn.fitness = shared_fitness
+
+        # replacing the weak individuals by new ones
+        # + elitism
+        immune_ids = []
+        for sp in self.species:
+            if len(sp) >= 5:
+                sp.sort(key=lambda id_: self.population[id_].fitness)
+                immune_id = sp[-1]
+                weak_ids = []
+                for i in range(int(self.elimination_rate * len(sp))):
+                    weak_ids.append(sp[i])
+
+                # new individuals
+                if len(weak_ids) > 1:
+                    for id_ in weak_ids[1:]:
+                        self.population[id_] = self.mate(id_, sp, weak_ids)
+
+                # elitism
+                if weak_ids:
+                    self.population[weak_ids[0]] = deepcopy(
+                        self.population[immune_id])
+                    immune_ids.append(weak_ids[0])
+
+        # mutations
+        candidates = [id_ for i in range(
+            self.population_size) if not id_ in immune_ids]
+
+        for id_ in candidates:
+            self.mutate(self.population[id_])
 
 
 # FUNCTIONS
+
+def sigmoid(x):
+    return 1 / (1 + exp(-4.9 * x))
 
 # Shaping functions
 
