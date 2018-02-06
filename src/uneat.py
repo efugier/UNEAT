@@ -20,7 +20,11 @@ from numpy import tanh, exp
 from numpy.random import normal
 
 
+def sigmoid(x):
+    return 1 / (1 + exp(-4.9 * x))
+
 # CLASSES
+
 
 class Connexion:
     """The connexion are the genes from the genetic algorithm point of view"""
@@ -36,7 +40,7 @@ class Connexion:
         self.id_ = id_
         self.i = i
         self.o = o
-        self.w = w
+        self.weight = w
 
         # Allows to desactivate a connexion
         # it is better to desactivate a connexion than removing it
@@ -89,13 +93,13 @@ class NeuralNetwork:
         # Connection all the input node to the output node
         # Minimal strructure of the NN
         connexion_id = 0
-        for e in range(self.nb_input):
-            for i in range(self.nb_output):
+        for i in range(self.nb_input):
+            for o in range(self.nb_input, self.nb_input + self.nb_output):
                 self.connexions[connexion_id] = Connexion(
-                    connexion_id, e, i, 1)
+                    connexion_id, i, o, 1)
                 connexion_id += 1
 
-    def generate_netork(self):
+    def generateNetwork(self):
         """generates the neural network using its connexion list
             O(|self.connexions|)"""
         self.neurons = {}
@@ -120,7 +124,23 @@ class NeuralNetwork:
                 if not c.i in self.neurons[c.o].input_list:
                     self.neurons[c.o].input_list.append(c.i)
 
-    def evaluate_network(self, input_vector):
+    def evaluateNeuron(self, neuron_id):
+        """Recursive function that evaluates a neuron
+           by evluating its conexions"""
+        neuron = self.neurons[neuron_id]  # Pointer for faster access and cleaner code
+        if neuron.already_evaluated:
+            return neuron.value
+
+        s = neuron.value
+        for input_neuron_id in neuron.input_list:
+            s += self.evaluateNeuron(input_neuron_id)
+
+        neuron.value = self.activation_funtion(s)
+        neuron.already_evaluated = True
+
+        return neuron.value
+
+    def evaluateNetwork(self, input_vector):
         """evaluates the neural network
            basically a depth first search
            O(|self.connexions|)"""
@@ -128,12 +148,12 @@ class NeuralNetwork:
         # Setting the input values
         self.neurons[0].value = 1  # Bias node
         for i in range(1, self.nb_input):
-            self.neurons[i].value = input_vector[i]
+            self.neurons[i].value = input_vector[i - 1]
             self.neurons[i].already_evaluated = True
 
         # Evaluating the NN
-        res = [self.evaluate_neuron(o)
-               for o in range(self.nb_input, self.nb_output)]
+        res = [self.evaluateNeuron(o)
+               for o in range(self.nb_input, self.nb_input + self.nb_output)]
 
         # Storing the values that are useful for the recursive connexions
         temp = {}
@@ -150,22 +170,6 @@ class NeuralNetwork:
             self.neurons[neuron_id].value = temp[neuron_id]
 
         return res
-
-    def evaluate_neuron(self, neuron_id):
-        """Recursive function that evaluates a neuron
-           by evluating its conexions"""
-        neuron = self.neurons[neuron_id]  # Pointer for faster access and cleaner code
-        if neuron.already_evaluated:
-            return neuron.value
-
-        s = neuron.value
-        for input_neuron_id in neuron.input_list:
-            s += self.evaluate_neuron(input_neuron_id)
-
-        neuron.value = self.activation_funtion(s)
-        neuron.already_evaluated = True
-
-        return neuron.value
 
 
 class SpawingPool:
@@ -199,7 +203,13 @@ class SpawingPool:
 
         # contains all the connexions that exist in every NN
         self.connexion_catalog = {}
-        self.latest_connexion_id = (1 + nb_input) * nb_output
+        connexion_id = 0
+        for i in range(self.nb_input + 1):  # + 1 for bias node
+            for o in range(self.nb_input + 1, self.nb_input + 1 + self.nb_output):
+                self.connexion_catalog[connexion_id] = Connexion(
+                    connexion_id, i, o, 1)
+                connexion_id += 1
+        self.latest_connexion_id = connexion_id
 
         self.recursive_connexion_catalog = {}
         self.latest_recursive_connexion_id = -1
@@ -261,7 +271,7 @@ class SpawingPool:
                 # No need to check if the connexion is well-oriented
 
         else:
-            neuron_id2 = choice(nn.neurons.keys())
+            neuron_id2 = choice(list(nn.neurons.keys()))
             candidates = [id1 for id1 in nn.neurons
                           if id1 != neuron_id2 and not id1 in nn.neurons[neuron_id2].input_list]
 
@@ -288,7 +298,7 @@ class SpawingPool:
         if force_input:
             neuron_id2 = choice(range(nn.nb_input))
         else:
-            neuron_id2 = choice(nn.neurons.keys())
+            neuron_id2 = choice(list(nn.neurons.keys()))
 
         candidates = []
         for id1 in nn.neurons:
@@ -319,7 +329,7 @@ class SpawingPool:
         Disables the old connexion
         O(|connexions|)"""
 
-        candidates = [c for c in nn.connexions.values if c.is_active]
+        candidates = [c for c in nn.connexions.values() if c.is_active]
         connexion = choice(candidates)
         connexion.is_active = False
 
@@ -349,7 +359,7 @@ class SpawingPool:
     def mutate(self, nn: NeuralNetwork):
         # mutate weights
         if random() < self.weight_mutation_proba:
-            for c in nn.connexions:
+            for c in nn.connexions.values():
                 if random() < self.uniform_perturbation_proba:
                     r = normal(c.weight)
                     # r = min(1, max(-1, r))
@@ -434,8 +444,8 @@ class SpawingPool:
         for id_ in self.connexion_catalog:
             if id_ in nn1.connexions:
                 if id_ in nn2.connexions:
-                    average_weight_difference += abs(nn1.connexions[id_] -
-                                                     nn2.connexions[id_])
+                    average_weight_difference += abs(nn1.connexions[id_].weight -
+                                                     nn2.connexions[id_].weight)
                     common_gene_count += 1
                 else:
                     disjoint_genes_count += 1
@@ -462,6 +472,7 @@ class SpawingPool:
                     len(nn2.recursive_connexions))
         disjoint = disjoint_genes_count / n
         recursive_disjoint = recursive_disjoint_genes_count / n_rec
+
         average_weight_difference /= common_gene_count
 
         distance = self.disjoint_coeff * disjoint + \
@@ -490,6 +501,7 @@ class SpawingPool:
         # creation of the species
         self.species = []
         for id_ in range(self.population_size):
+            self.population[id_].generateNetwork()
             for sp in self.species:
                 representative_id = sp[0]
                 if distance_matrix[id_][representative_id] < self.same_species_threshold:
@@ -500,19 +512,20 @@ class SpawingPool:
 
         # evaluation of the individuals using fitness sharing
         for sp in self.species:
-            raw_fitness_list = self.evaluation_function(sp)
-            for i, nn in enumerate(sp):  # fitness of the nn
+            raw_fitness_list = self.evaluation_function(
+                [self.population[id_] for id_ in sp])
+            for i, id_ in enumerate(sp):  # fitness of the nn
                 # raw fitness
                 f = raw_fitness_list[i]
 
                 # niche count
-                m = sum([self.sharingFunction(nn.id_, j, distance_matrix)
+                m = sum([self.sharingFunction(id_, j, distance_matrix)
                          for j in range(self.population_size)])
 
                 # shared fitness
                 shared_fitness = (f ** self.scaling_factor) / m
 
-                nn.fitness = shared_fitness
+                self.population[id_].fitness = shared_fitness
 
         # replacing the weak individuals by new ones
         # + elitism
@@ -545,9 +558,6 @@ class SpawingPool:
 
 
 # FUNCTIONS
-
-def sigmoid(x):
-    return 1 / (1 + exp(-4.9 * x))
 
 # Shaping functions
 
@@ -591,3 +601,41 @@ def load(file_name='latest_NN'):
         unpickler = Unpickler(file_)
         obj = unpickler.load()
     return obj
+
+
+# Test functions
+
+def evalXOR(nn_list):
+    pat = [[[0, 0], [0]],
+           [[0, 1], [1]],
+           [[1, 0], [1]],
+           [[1, 1], [0]]]
+
+    res = []
+    for nn in nn_list:
+        fit = 1 / sum([(nn.evaluateNetwork(i)[0] - o)**2 for i, o in pat])
+        res.append(fit)
+
+    return res
+
+
+def printXOR(nn: NeuralNetwork):
+    pat = [[[0, 0], [0]],
+           [[0, 1], [1]],
+           [[1, 0], [1]],
+           [[1, 1], [1]]]
+    for p in pat:
+        print(p[0], '->', (nn.evaluateNetwork(p[0])))
+
+
+def solveXOR():
+    spawing_pool = SpawingPool(evaluation_function=evalXOR)
+
+    spawing_pool.initPopulation()
+
+    for _ in range(100):
+        spawing_pool.newGeneration()
+        printXOR(spawing_pool.population[spawing_pool.species[0][-1]])
+
+
+solveXOR()
