@@ -47,6 +47,9 @@ class Connexion:
         # in order to keep track of the history of the evolution
         self.is_active = True
 
+    def display(self):
+        print("i:", self.i, " o:", self.o, " is active:", self.is_active)
+
 
 class Neuron:
     """A very basic neuron which has a value, an id, and a list of input"""
@@ -127,7 +130,9 @@ class NeuralNetwork:
     def evaluateNeuron(self, neuron_id):
         """Recursive function that evaluates a neuron
            by evluating its conexions"""
-        neuron = self.neurons[neuron_id]  # Pointer for faster access and cleaner code
+
+        # Pointer for faster access and cleaner code
+        neuron = self.neurons[neuron_id]
         if neuron.already_evaluated:
             return neuron.value
 
@@ -221,7 +226,7 @@ class SpawingPool:
 
         self.same_species_threshold = 3
 
-        self.squaring_factor = 1
+        self.squaring_factor = 1  # high value => all or nothing
         self.scaling_factor = 1
 
         self.population_size = population_size
@@ -359,13 +364,14 @@ class SpawingPool:
     def mutate(self, nn: NeuralNetwork):
         # mutate weights
         if random() < self.weight_mutation_proba:
-            for c in nn.connexions.values():
-                if random() < self.uniform_perturbation_proba:
-                    r = normal(c.weight)
-                    # r = min(1, max(-1, r))
-                    c.weight = r
-                else:
-                    c.weight = 2 * random() - 1
+            c = choice(list(nn.connexions.values()))
+            # for c in nn.connexions.values():
+            if random() < self.uniform_perturbation_proba:
+                r = normal(c.weight)
+                # r = min(1, max(-1, r))
+                c.weight = r
+            else:
+                c.weight = 2 * random() - 1
 
         # mutate add connexion
         if random() < self.new_connexion_proba:
@@ -385,6 +391,7 @@ class SpawingPool:
             self.addNeuron(nn)
 
     def mate(self, id_, sp, weak_ids=None):
+        """produces a child of 2 neurons from the specy in parameter"""
         if not weak_ids:
             weak_ids = []
 
@@ -399,6 +406,7 @@ class SpawingPool:
         nn1, nn2 = self.population[id1], self.population[id2]
         new_nn = NeuralNetwork(id_, self.nb_input, self.nb_output)
 
+        # Normal connexions
         for id_ in self.connexion_catalog:
             if id_ in nn1.connexions and id_ in nn2.connexions:
                 if random() < 0.5:
@@ -406,9 +414,28 @@ class SpawingPool:
                 else:
                     new_nn.connexions[id_] = deepcopy(nn2.connexions[id_])
 
+                # Activation of the fitest parent to prevent neuron disconnexion (very important)
+                if nn1.connexions[id_].is_active:
+                    new_nn.connexions[id_].is_active = True
+
             # Inheriting dijoints genes from the most fit parent
             elif id_ in nn1.connexions:
                 new_nn.connexions[id_] = deepcopy(nn1.connexions[id_])
+
+        # Recursive Connexions
+        for id_ in self.recursive_connexion_catalog:
+            if id_ in nn1.recursive_connexions and id_ in nn2.recursive_connexions:
+                if random() < 0.5:
+                    new_nn.recursive_connexions[id_] = deepcopy(
+                        nn1.recursive_connexions[id_])
+                else:
+                    new_nn.recursive_connexions[id_] = deepcopy(
+                        nn2.recursive_connexions[id_])
+
+            # Inheriting dijoints genes from the most fit parent
+            elif id_ in nn1.recursive_connexions:
+                new_nn.recursive_connexions[id_] = deepcopy(
+                    nn1.recursive_connexions[id_])
 
         return new_nn
 
@@ -633,7 +660,7 @@ def solveXOR():
 
     spawing_pool.initPopulation()
 
-    for _ in range(100):
+    for _ in range(50):
         spawing_pool.newGeneration()
         printXOR(spawing_pool.population[spawing_pool.species[0][-1]])
 
