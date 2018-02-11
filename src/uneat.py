@@ -23,6 +23,9 @@ from numpy.random import normal
 def sigmoid(x):
     return 1 / (1 + exp(-4.9 * x))
 
+# def sigmoid(x):
+#     return tanh(3 * x)
+
 # CLASSES
 
 
@@ -48,7 +51,8 @@ class Connexion:
         self.is_active = True
 
     def display(self):
-        print("i:", self.i, " o:", self.o, " is active:", self.is_active)
+        print("i:", self.i, " weight:", self.weight,
+              " o:", self.o, " is active:", self.is_active)
 
 
 class Neuron:
@@ -59,7 +63,7 @@ class Neuron:
     # but classes keeps the code clean and homegeneous
 
     def __init__(self, id_, input_list=None):
-        # List of the ID of the neurones that are connected to this one
+        # List of the [ID, weight] of the neurones that are connected to this one
         if not input_list:
             self.input_list = []
         else:
@@ -75,7 +79,7 @@ class Neuron:
 class NeuralNetwork:
     """A neural network which is a genome from the genetic algorithm point of view"""
 
-    def __init__(self, id_, nb_input, nb_output, activation_funtion=tanh):
+    def __init__(self, id_, nb_input, nb_output, activation_funtion=sigmoid):
         self.nb_input = 1 + nb_input  # Adding a bias node
         self.nb_output = nb_output
         self.activation_funtion = activation_funtion
@@ -92,15 +96,36 @@ class NeuralNetwork:
 
         self.neurons[0] = Neuron(0)
         self.neurons[0].value = 1  # bias node always set to 1
+        self.neurons[0].already_evaluated = True
 
-        # Connection all the input node to the output node
-        # Minimal strructure of the NN
+        # Connecting all the input node to the each output node
+        # (Minimal strructure of a NN)
         connexion_id = 0
         for i in range(self.nb_input):
             for o in range(self.nb_input, self.nb_input + self.nb_output):
                 self.connexions[connexion_id] = Connexion(
-                    connexion_id, i, o, 1)
+                    connexion_id, i, o, 2 * random() - 1)
                 connexion_id += 1
+
+        self.generateNetwork()
+
+    def display(self):
+        for c in self.connexions.values():
+            c.display()
+
+    # def isForwardOld(self, neuron_id1, neuron_id2):
+    #     """Makes sure a feed forward connexion should go from id1 to id2
+    #     return True if yes, False if no
+    #     O(|connexions|)"""
+    #     print("-------")
+    #     for c in self.connexions.values():
+    #         c.display()
+    #     print(neuron_id1, "->", neuron_id2)
+    #     for i, _ in self.neurons[neuron_id2].input_list:
+    #         if neuron_id2 == i or neuron_id2 in range(self.nb_input) or not self.isForward(neuron_id1, i):
+    #             return False
+
+    #     return True
 
     def generateNetwork(self):
         """generates the neural network using its connexion list
@@ -109,6 +134,7 @@ class NeuralNetwork:
 
         self.neurons[0] = Neuron(0)
         self.neurons[0].value = 1  # bias node always set to 1
+        self.neurons[0].already_evaluated = True
 
         for e in range(1, self.nb_input):
             self.neurons[e] = Neuron(e)
@@ -124,8 +150,8 @@ class NeuralNetwork:
                     self.neurons[c.o] = Neuron(c.o)
 
                 # Connecting the neurons
-                if not c.i in self.neurons[c.o].input_list:
-                    self.neurons[c.o].input_list.append(c.i)
+                if not c.i in [i for i, _ in self.neurons[c.o].input_list]:
+                    self.neurons[c.o].input_list.append([c.i, c.weight])
 
     def evaluateNeuron(self, neuron_id):
         """Recursive function that evaluates a neuron
@@ -137,8 +163,8 @@ class NeuralNetwork:
             return neuron.value
 
         s = neuron.value
-        for input_neuron_id in neuron.input_list:
-            s += self.evaluateNeuron(input_neuron_id)
+        for id_, weight in neuron.input_list:
+            s += weight * self.evaluateNeuron(id_)
 
         neuron.value = self.activation_funtion(s)
         neuron.already_evaluated = True
@@ -149,9 +175,9 @@ class NeuralNetwork:
         """evaluates the neural network
            basically a depth first search
            O(|self.connexions|)"""
-
         # Setting the input values
         self.neurons[0].value = 1  # Bias node
+        self.neurons[0].already_evaluated = True
         for i in range(1, self.nb_input):
             self.neurons[i].value = input_vector[i - 1]
             self.neurons[i].already_evaluated = True
@@ -163,7 +189,13 @@ class NeuralNetwork:
         # Storing the values that are useful for the recursive connexions
         temp = {}
         for c in self.recursive_connexions.values():
-            temp[c.o] = self.neurons[c.i].value
+            if not c.o in temp:
+                temp[c.o] = 0
+            temp[c.o] += c.weight * self.neurons[c.i].value
+
+        # Applying activation function
+        for id_ in temp:
+            temp[id_] = self.activation_funtion(temp[id_])
 
         # Reseting the network
         for neuron_id in self.neurons:  # Resets the network
@@ -175,6 +207,25 @@ class NeuralNetwork:
             self.neurons[neuron_id].value = temp[neuron_id]
 
         return res
+
+    def markEvaluationTree(self, neuron_id, necessary_ids: dict):
+        """Mark all the neurons that are necessary to the evaluation of neuron_id
+           by setting their values in necessary_ids to 1
+           O(|connexions|)"""
+        necessary_ids[neuron_id] = 1
+        for id_, _ in self.neurons[neuron_id].input_list:
+            self.markEvaluationTree(id_, necessary_ids)
+
+    def isForward(self, neuron_id1, neuron_id2):
+        """Tells wether a connexion from neuron_id1 to neuron_id2 would be
+           feed forward, i.e. if id2 is not necessary for the the evaluation of id1
+           O(|connexions|)"""
+        necessary_ids = {}  # ids of the neurons that are necessary for the evaluation of neuron_id1
+        self.markEvaluationTree(neuron_id1, necessary_ids)
+
+        if neuron_id2 in necessary_ids:
+            return False
+        return True
 
 
 class SpawingPool:
@@ -212,7 +263,7 @@ class SpawingPool:
         for i in range(self.nb_input + 1):  # + 1 for bias node
             for o in range(self.nb_input + 1, self.nb_input + 1 + self.nb_output):
                 self.connexion_catalog[connexion_id] = Connexion(
-                    connexion_id, i, o, 1)
+                    connexion_id, i, o, 2 * random() - 1)
                 connexion_id += 1
         self.latest_connexion_id = connexion_id
 
@@ -270,21 +321,24 @@ class SpawingPool:
         if force_input:
             neuron_id1 = choice(range(nn.nb_input))
             candidates = [id2 for id2 in nn.neurons
-                          if id2 != neuron_id1 and not neuron_id1 in nn.neurons[id2].input_list]
+                          if id2 != neuron_id1 and not neuron_id1 in nn.neurons[id2].input_list
+                          and not id2 in range(nn.nb_input)]
             if candidates:
                 neuron_id2 = choice(candidates)
                 # No need to check if the connexion is well-oriented
 
         else:
-            neuron_id2 = choice(list(nn.neurons.keys()))
-            candidates = [id1 for id1 in nn.neurons
-                          if id1 != neuron_id2 and not id1 in nn.neurons[neuron_id2].input_list]
+            neuron_id1 = choice([id1 for id1 in nn.neurons.keys()
+                                 if not id1 in range(nn.nb_input, nn.nb_output)])
+            candidates = [id2 for id2 in nn.neurons
+                          if id2 != neuron_id1 and not neuron_id1 in nn.neurons[id2].input_list
+                          and not id2 in range(nn.nb_input)]
 
             if candidates:
-                neuron_id1 = choice(candidates)
+                neuron_id2 = choice(candidates)
 
                 # Making sure the connexion is well oriented
-                if not isForward(neuron_id1, neuron_id2, nn.neurons):
+                if not nn.isForward(neuron_id1, neuron_id2):
                     neuron_id1, neuron_id2 = neuron_id2, neuron_id1
 
         if candidates:
@@ -368,8 +422,7 @@ class SpawingPool:
             # for c in nn.connexions.values():
             if random() < self.uniform_perturbation_proba:
                 r = normal(c.weight)
-                # r = min(1, max(-1, r))
-                c.weight = r
+                c.weight = normal(c.weight)
             else:
                 c.weight = 2 * random() - 1
 
@@ -390,13 +443,19 @@ class SpawingPool:
         if random() < self.new_neuron_proba:
             self.addNeuron(nn)
 
-    def mate(self, id_, sp, weak_ids=None):
+    def mate(self, new_id_, sp, weak_ids=None):
         """produces a child of 2 neurons from the specy in parameter"""
         if not weak_ids:
             weak_ids = []
 
         id1 = choice(sp)
         candidates = [id2 for id2 in sp if id2 != id1]
+        if not candidates:
+            new_nn = deepcopy(self.population[id1])
+            new_nn.id_ = new_id_
+            self.mutate(new_nn)
+            return new_nn
+
         id2 = choice(candidates)
 
         # id1 is always the most fit nn
@@ -404,7 +463,7 @@ class SpawingPool:
             id1, id2 = id2, id1
 
         nn1, nn2 = self.population[id1], self.population[id2]
-        new_nn = NeuralNetwork(id_, self.nb_input, self.nb_output)
+        new_nn = NeuralNetwork(new_id_, self.nb_input, self.nb_output)
 
         # Normal connexions
         for id_ in self.connexion_catalog:
@@ -509,7 +568,7 @@ class SpawingPool:
         return distance
 
     def initPopulation(self):
-        self.population = [0] * self.population_size
+        self.population = [None] * self.population_size
         for id_ in range(self.population_size):
             self.population[id_] = NeuralNetwork(
                 id_, self.nb_input, self.nb_output)
@@ -518,8 +577,7 @@ class SpawingPool:
         d = distance_matrix[id1][id2]
         if d < self.same_species_threshold:
             return 1 - (d / self.same_species_threshold) ** self.squaring_factor
-        else:
-            return 0
+        return 0
 
     def newGeneration(self):
         # calculation of the distance matrix
@@ -528,7 +586,6 @@ class SpawingPool:
         # creation of the species
         self.species = []
         for id_ in range(self.population_size):
-            self.population[id_].generateNetwork()
             for sp in self.species:
                 representative_id = sp[0]
                 if distance_matrix[id_][representative_id] < self.same_species_threshold:
@@ -545,6 +602,10 @@ class SpawingPool:
                 # raw fitness
                 f = raw_fitness_list[i]
 
+                if f > self.max_fitness:
+                    self.best_individual = deepcopy(self.population[id_])
+                    self.max_fitness = f
+
                 # niche count
                 m = sum([self.sharingFunction(id_, j, distance_matrix)
                          for j in range(self.population_size)])
@@ -554,34 +615,62 @@ class SpawingPool:
 
                 self.population[id_].fitness = shared_fitness
 
-        # replacing the weak individuals by new ones
-        # + elitism
+        id_list = sorted([id_ for id_ in range(self.population_size)],
+                         key=lambda id_: self.population[id_].fitness)
+
+        # individuals that are to be replaced by new ones
+        weak_ids = id_list[:int(self.elimination_rate * self.population_size)]
+
+        # elitism
         immune_ids = []
         for sp in self.species:
             if len(sp) >= 5:
-                sp.sort(key=lambda id_: self.population[id_].fitness)
-                immune_id = sp[-1]
-                weak_ids = []
-                for i in range(int(self.elimination_rate * len(sp))):
-                    weak_ids.append(sp[i])
+                immune_ids.append(
+                    max(sp, key=lambda id_: self.population[id_].fitness))
 
-                # new individuals
-                if len(weak_ids) > 1:
-                    for id_ in weak_ids[1:]:
-                        self.population[id_] = self.mate(id_, sp, weak_ids)
+        ids_for_elites = weak_ids[:len(immune_ids)]
+        ids_for_new_individuals = weak_ids[len(immune_ids):]
 
-                # elitism
-                if weak_ids:
-                    self.population[weak_ids[0]] = deepcopy(
-                        self.population[immune_id])
-                    immune_ids.append(weak_ids[0])
+        # Total fitness of each species
+        sp_fitness_list = [
+            sum([self.population[id_].fitness for id_ in sp]) for sp in self.species]
+        total_fitness = sum(sp_fitness_list)
 
-        # mutations
-        candidates = [id_ for i in range(
-            self.population_size) if not id_ in immune_ids]
+        # number of offsprings per species
+        number_offspring_list = [
+            int((f / total_fitness) * len(ids_for_new_individuals)) for f in sp_fitness_list]
 
-        for id_ in candidates:
-            self.mutate(self.population[id_])
+        # Correction
+        corr_number = len(ids_for_new_individuals) - sum(number_offspring_list)
+        while corr_number > 0:
+            number_offspring_list[corr_number %
+                                  len(ids_for_new_individuals)] += 1
+            corr_number -= 1
+
+        new_population = [None] * self.population_size
+
+        # elitism
+        for i, elite_id in enumerate(immune_ids):
+            new_population[ids_for_elites[i]] = self.population[elite_id]
+
+        # new individuals
+        j = 0
+        for i, sp in enumerate(self.species):
+            for _ in range(number_offspring_list[i]):
+                new_population[ids_for_new_individuals[j]] = self.mate(
+                    ids_for_new_individuals[j], sp)
+                j += 1
+
+        # others
+        for id_ in range(self.population_size):
+            if not new_population[id_]:
+                self.mutate(self.population[id_])
+                new_population[id_] = self.population[id_]
+
+        self.population = new_population
+
+        for nn in self.population:
+            nn.generateNetwork()
 
 
 # FUNCTIONS
@@ -593,18 +682,6 @@ def isSameConnexion(c1, c2):
     if c1.i == c2.i and c1.o == c2.o:
         return True
     return False
-
-
-def isForward(neuron_id1, neuron_id2, neurons: dict):
-    """Makes sure a feed forward connexion should go from id1 to id2
-       return True if yes, False if no
-       O(|connexions|)"""
-
-    for i in neurons[neuron_id2].input_list:
-        if neuron_id2 == i or not isForward(neuron_id1, i, neurons):
-            return False
-
-    return True
 
 
 # Genetic function
@@ -632,21 +709,21 @@ def load(file_name='latest_NN'):
 
 # Test functions
 
-def evalXOR(nn_list):
+def evalOR(nn_list):
     pat = [[[0, 0], [0]],
            [[0, 1], [1]],
            [[1, 0], [1]],
-           [[1, 1], [0]]]
+           [[1, 1], [1]]]
 
     res = []
     for nn in nn_list:
-        fit = 1 / sum([(nn.evaluateNetwork(i)[0] - o)**2 for i, o in pat])
+        fit = 4 - sum([(nn.evaluateNetwork(i)[0] - o[0])**2 for i, o in pat])
         res.append(fit)
 
     return res
 
 
-def printXOR(nn: NeuralNetwork):
+def printOR(nn: NeuralNetwork):
     pat = [[[0, 0], [0]],
            [[0, 1], [1]],
            [[1, 0], [1]],
@@ -655,14 +732,30 @@ def printXOR(nn: NeuralNetwork):
         print(p[0], '->', (nn.evaluateNetwork(p[0])))
 
 
-def solveXOR():
-    spawing_pool = SpawingPool(evaluation_function=evalXOR)
+def solveOR():
+    spawing_pool = SpawingPool(evaluation_function=evalOR)
 
     spawing_pool.initPopulation()
 
-    for _ in range(50):
+    for _ in range(10):
         spawing_pool.newGeneration()
-        printXOR(spawing_pool.population[spawing_pool.species[0][-1]])
+        print(spawing_pool.best_individual.fitness)
+        # spawing_pool.best_individual.display()
+        printOR(spawing_pool.best_individual)
 
 
-solveXOR()
+def test():
+    nn = NeuralNetwork(0, 2, 1)
+    nn.generateNetwork()
+    print(len(nn.connexions))
+    for c in nn.connexions.values():
+        c.display()
+    nn.connexions = {0: Connexion(0, 0, 3, -1),
+                     1: Connexion(1, 1, 3, 1),
+                     2: Connexion(2, 2, 3, 1)}
+    nn.generateNetwork()
+    printOR(nn)
+
+
+solveOR()
+# test()
