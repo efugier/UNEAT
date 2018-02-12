@@ -228,6 +228,19 @@ class NeuralNetwork:
         return True
 
 
+class Species:
+    def __init__(self, members_ids=None):
+        self.potential = 0
+        self.stagnation = 0
+        self.is_stale = False
+        self.representative_id = None
+
+        if not members_ids:
+            self.members_ids = []
+        else:
+            self.members_ids = members_ids
+
+
 class SpawingPool:
     """The class which supervises the evolution"""
 
@@ -243,11 +256,6 @@ class SpawingPool:
         # A function that can evalutate a LIST of neural network
         # and return a LIST of fitness in the SAME ORDER
         self.evaluation_function = evaluation_function
-
-        self.generation_nb = 0
-
-        self.best_individual = None
-        self.max_fitness = 0
 
         # The goal here is that 2 instances of the same neuron in 2 different NN
         # should have the same id, same for the connexions
@@ -273,23 +281,29 @@ class SpawingPool:
         # coefficients for the distance calculation
         self.disjoint_coeff = 1
         self.recursive_disjoint_coeff = 1
-        self.weight_average_coeff = 1
+        self.average_weight_coeff = 0.4
 
         self.same_species_threshold = 3
 
         self.squaring_factor = 1  # high value => all or nothing
         self.scaling_factor = 1
 
+        # Genectic attributes
         self.population_size = population_size
         self.population = []
+        self.generation_nb = 0
+        self.stagnation = 0
+
+        self.best_individual = None
+        self.max_fitness = 0
 
         # Species are lists of individuals
         self.species = []
 
         # Genetic Algorithm parameters
         self.crossover_rate = 0.75
-
         self.elimination_rate = 0.4
+        self.max_stagnation = 6
 
         self.weight_mutation_proba = 0.8
         self.uniform_perturbation_proba = 0.9
@@ -443,13 +457,13 @@ class SpawingPool:
         if random() < self.new_neuron_proba:
             self.addNeuron(nn)
 
-    def mate(self, new_id_, sp, weak_ids=None):
+    def mate(self, new_id_, sp: Species, weak_ids=None):
         """produces a child of 2 neurons from the specy in parameter"""
         if not weak_ids:
             weak_ids = []
 
-        id1 = choice(sp)
-        candidates = [id2 for id2 in sp if id2 != id1]
+        id1 = choice(sp.members_ids)
+        candidates = [id2 for id2 in sp.members_ids if id2 != id1]
         if not candidates:
             new_nn = deepcopy(self.population[id1])
             new_nn.id_ = new_id_
@@ -563,7 +577,7 @@ class SpawingPool:
 
         distance = self.disjoint_coeff * disjoint + \
             self.recursive_disjoint_coeff * recursive_disjoint + \
-            self.weight_average_coeff * average_weight_difference
+            self.average_weight_coeff * average_weight_difference
 
         return distance
 
@@ -584,21 +598,21 @@ class SpawingPool:
         distance_matrix = self.buildDistanceMatrix()
 
         # creation of the species
-        self.species = []
         for id_ in range(self.population_size):
             for sp in self.species:
-                representative_id = sp[0]
-                if distance_matrix[id_][representative_id] < self.same_species_threshold:
-                    sp.append(id_)
+                if distance_matrix[id_][sp.representative_id] < self.same_species_threshold:
+                    sp.members_ids.append(id_)
                     break
             else:
-                self.species.append([id_])
+                sp = Species([id_])
+                sp.representative_id = id_
+                self.species.append(sp)
 
         # evaluation of the individuals using fitness sharing
         for sp in self.species:
             raw_fitness_list = self.evaluation_function(
-                [self.population[id_] for id_ in sp])
-            for i, id_ in enumerate(sp):  # fitness of the nn
+                [self.population[id_] for id_ in sp.members_ids])
+            for i, id_ in enumerate(sp.members_ids):  # fitness of the nn
                 # raw fitness
                 f = raw_fitness_list[i]
 
@@ -615,6 +629,20 @@ class SpawingPool:
 
                 self.population[id_].fitness = shared_fitness
 
+        # Stagnation and potential
+        for sp in self.species:
+            best = self.population[max(
+                sp.members_ids, key=lambda id_: self.population[id_].fitness)]
+            if (self.population[sp.representative_id].fitness - best.fitness) / best.fitness > 0.1:
+                sp.stagnation = 0
+            else:
+                sp.stagnation += 1
+            if sp.stagnation > self.max_stagnation:
+                sp.is_stale = True
+                print("********removing species")
+
+        self.species = [sp for sp in self.species if not sp.is_stale]
+
         id_list = sorted([id_ for id_ in range(self.population_size)],
                          key=lambda id_: self.population[id_].fitness)
 
@@ -624,24 +652,32 @@ class SpawingPool:
         # elitism
         immune_ids = []
         for sp in self.species:
-            if len(sp) >= 5:
+            if len(sp.members_ids) >= 5:
                 immune_ids.append(
-                    max(sp, key=lambda id_: self.population[id_].fitness))
+                    max(sp.members_ids, key=lambda id_: self.population[id_].fitness))
 
         ids_for_elites = weak_ids[:len(immune_ids)]
         ids_for_new_individuals = weak_ids[len(immune_ids):]
 
         # Total fitness of each species
-        sp_fitness_list = [
-            sum([self.population[id_].fitness for id_ in sp]) for sp in self.species]
-        total_fitness = sum(sp_fitness_list)
+
+        sp_potential_list = []
+        for sp in self.species:
+            fitness = sum(
+                [self.population[id_].fitness for id_ in sp.members_ids])
+            potential = fitness * (1 - sp.stagnation / self.max_stagnation)
+            sp_potential_list.append(potential)
+        total_potential = max(1, sum(sp_potential_list))
 
         # number of offsprings per species
+        for p in sp_potential_list:
+            print((p / total_potential) * len(ids_for_new_individuals))
         number_offspring_list = [
-            int((f / total_fitness) * len(ids_for_new_individuals)) for f in sp_fitness_list]
+            int((p / total_potential) * len(ids_for_new_individuals)) for p in sp_potential_list]
 
         # Correction
         corr_number = len(ids_for_new_individuals) - sum(number_offspring_list)
+        print(len(number_offspring_list))
         while corr_number > 0:
             number_offspring_list[corr_number %
                                   len(ids_for_new_individuals)] += 1
@@ -658,7 +694,7 @@ class SpawingPool:
         for i, sp in enumerate(self.species):
             for _ in range(number_offspring_list[i]):
                 new_population[ids_for_new_individuals[j]] = self.mate(
-                    ids_for_new_individuals[j], sp)
+                    ids_for_new_individuals[j], sp, weak_ids)
                 j += 1
 
         # others
@@ -671,6 +707,101 @@ class SpawingPool:
 
         for nn in self.population:
             nn.generateNetwork()
+
+        self.generation_nb += 1
+
+    # def newGeneration(self):
+    #     # calculation of the distance matrix
+    #     distance_matrix = self.buildDistanceMatrix()
+
+    #     # creation of the species
+    #     self.species = []
+    #     for id_ in range(self.population_size):
+    #         for sp in self.species:
+    #             representative_id = sp[0]
+    #             if distance_matrix[id_][representative_id] < self.same_species_threshold:
+    #                 sp.append(id_)
+    #                 break
+    #         else:
+    #             self.species.append([id_])
+
+    #     # evaluation of the individuals using fitness sharing
+    #     for sp in self.species:
+    #         raw_fitness_list = self.evaluation_function(
+    #             [self.population[id_] for id_ in sp])
+    #         for i, id_ in enumerate(sp):  # fitness of the nn
+    #             # raw fitness
+    #             f = raw_fitness_list[i]
+
+    #             if f > self.max_fitness:
+    #                 self.best_individual = deepcopy(self.population[id_])
+    #                 self.max_fitness = f
+
+    #             # niche count
+    #             m = sum([self.sharingFunction(id_, j, distance_matrix)
+    #                      for j in range(self.population_size)])
+
+    #             # shared fitness
+    #             shared_fitness = (f ** self.scaling_factor) / m
+
+    #             self.population[id_].fitness = shared_fitness
+
+    #     id_list = sorted([id_ for id_ in range(self.population_size)],
+    #                      key=lambda id_: self.population[id_].fitness)
+
+    #     # individuals that are to be replaced by new ones
+    #     weak_ids = id_list[:int(self.elimination_rate * self.population_size)]
+
+    #     # elitism
+    #     immune_ids = []
+    #     for sp in self.species:
+    #         if len(sp) >= 5:
+    #             immune_ids.append(
+    #                 max(sp, key=lambda id_: self.population[id_].fitness))
+
+    #     ids_for_elites = weak_ids[:len(immune_ids)]
+    #     ids_for_new_individuals = weak_ids[len(immune_ids):]
+
+    #     # Total fitness of each species
+    #     sp_fitness_list = [
+    #         sum([self.population[id_].fitness for id_ in sp]) for sp in self.species]
+    #     total_fitness = sum(sp_fitness_list)
+
+    #     # number of offsprings per species
+    #     number_offspring_list = [
+    #         int((f / total_fitness) * len(ids_for_new_individuals)) for f in sp_fitness_list]
+
+    #     # Correction
+    #     corr_number = len(ids_for_new_individuals) - sum(number_offspring_list)
+    #     while corr_number > 0:
+    #         number_offspring_list[corr_number %
+    #                               len(ids_for_new_individuals)] += 1
+    #         corr_number -= 1
+
+    #     new_population = [None] * self.population_size
+
+    #     # elitism
+    #     for i, elite_id in enumerate(immune_ids):
+    #         new_population[ids_for_elites[i]] = self.population[elite_id]
+
+    #     # new individuals
+    #     j = 0
+    #     for i, sp in enumerate(self.species):
+    #         for _ in range(number_offspring_list[i]):
+    #             new_population[ids_for_new_individuals[j]] = self.mate(
+    #                 ids_for_new_individuals[j], sp)
+    #             j += 1
+
+    #     # others
+    #     for id_ in range(self.population_size):
+    #         if not new_population[id_]:
+    #             self.mutate(self.population[id_])
+    #             new_population[id_] = self.population[id_]
+
+    #     self.population = new_population
+
+    #     for nn in self.population:
+    #         nn.generateNetwork()
 
 
 # FUNCTIONS
@@ -713,7 +844,7 @@ def evalOR(nn_list):
     pat = [[[0, 0], [0]],
            [[0, 1], [1]],
            [[1, 0], [1]],
-           [[1, 1], [1]]]
+           [[1, 1], [0]]]
 
     res = []
     for nn in nn_list:
@@ -727,7 +858,7 @@ def printOR(nn: NeuralNetwork):
     pat = [[[0, 0], [0]],
            [[0, 1], [1]],
            [[1, 0], [1]],
-           [[1, 1], [1]]]
+           [[1, 1], [0]]]
     for p in pat:
         print(p[0], '->', (nn.evaluateNetwork(p[0])))
 
@@ -737,23 +868,27 @@ def solveOR():
 
     spawing_pool.initPopulation()
 
-    for _ in range(10):
+    for _ in range(50):
         spawing_pool.newGeneration()
         print(spawing_pool.best_individual.fitness)
-        # spawing_pool.best_individual.display()
+        print(spawing_pool.max_fitness)
         printOR(spawing_pool.best_individual)
+    spawing_pool.best_individual.display()
 
 
 def test():
     nn = NeuralNetwork(0, 2, 1)
+    nn.connexions = {0: Connexion(0, 0, 3, -0.5),
+                     1: Connexion(1, 1, 3, 1),
+                     2: Connexion(2, 2, 3, 1),
+                     3: Connexion(3, 1, 4, 1),
+                     4: Connexion(4, 2, 4, 1),
+                     5: Connexion(5, 0, 4, -1.7),
+                     6: Connexion(6, 4, 3, -2)}
     nn.generateNetwork()
     print(len(nn.connexions))
     for c in nn.connexions.values():
         c.display()
-    nn.connexions = {0: Connexion(0, 0, 3, -1),
-                     1: Connexion(1, 1, 3, 1),
-                     2: Connexion(2, 2, 3, 1)}
-    nn.generateNetwork()
     printOR(nn)
 
 
