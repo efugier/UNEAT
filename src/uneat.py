@@ -677,7 +677,6 @@ class SpawingPool:
 
         # Correction
         corr_number = len(ids_for_new_individuals) - sum(number_offspring_list)
-        print(len(number_offspring_list))
         while corr_number > 0:
             number_offspring_list[corr_number %
                                   len(ids_for_new_individuals)] += 1
