@@ -241,7 +241,7 @@ class SpawingPool:
         self.max_nb_neurons = max_nb_neurons
 
         # A function that can evalutate a LIST of neural network
-        # and return a LIST of fitness in the SAME ORDER
+        # and return a LIST of fitness in the SAME XORDER
         self.evaluation_function = evaluation_function
 
         self.generation_nb = 0
@@ -418,13 +418,13 @@ class SpawingPool:
     def mutate(self, nn: NeuralNetwork):
         # mutate weights
         if random() < self.weight_mutation_proba:
-            c = choice(list(nn.connexions.values()))
-            # for c in nn.connexions.values():
-            if random() < self.uniform_perturbation_proba:
-                r = normal(c.weight)
-                c.weight = normal(c.weight)
-            else:
-                c.weight = 2 * random() - 1
+            # c = choice(list(nn.connexions.values()))
+            for c in nn.connexions.values():
+                if random() < self.uniform_perturbation_proba:
+                    r = normal(c.weight)
+                    c.weight = normal(c.weight)
+                else:
+                    c.weight = 2 * random() - 1
 
         # mutate add connexion
         if random() < self.new_connexion_proba:
@@ -651,7 +651,9 @@ class SpawingPool:
 
         # elitism
         for i, elite_id in enumerate(immune_ids):
-            new_population[ids_for_elites[i]] = self.population[elite_id]
+            elite_nn = deepcopy(self.population[elite_id])
+            elite_nn.id_ = ids_for_elites[i]
+            new_population[ids_for_elites[i]] = elite_nn
 
         # new individuals
         j = 0
@@ -709,11 +711,11 @@ def load(file_name='latest_NN'):
 
 # Test functions
 
-def evalOR(nn_list):
+def evalXOR(nn_list):
     pat = [[[0, 0], [0]],
            [[0, 1], [1]],
            [[1, 0], [1]],
-           [[1, 1], [1]]]
+           [[1, 1], [0]]]
 
     res = []
     for nn in nn_list:
@@ -723,39 +725,57 @@ def evalOR(nn_list):
     return res
 
 
-def printOR(nn: NeuralNetwork):
+def printXOR(nn: NeuralNetwork):
     pat = [[[0, 0], [0]],
            [[0, 1], [1]],
            [[1, 0], [1]],
-           [[1, 1], [1]]]
+           [[1, 1], [0]]]
     for p in pat:
         print(p[0], '->', (nn.evaluateNetwork(p[0])))
 
 
-def solveOR():
-    spawing_pool = SpawingPool(evaluation_function=evalOR)
+def solveXOR():
+    spawing_pool = SpawingPool(evaluation_function=evalXOR)
 
     spawing_pool.initPopulation()
 
-    for _ in range(10):
+    # nn = NeuralNetwork(42, 2, 1)
+    # nn.connexions = {0: Connexion(0, 0, 3, -0.5),
+    #                  1: Connexion(1, 1, 3, 1),
+    #                  2: Connexion(2, 2, 3, 1),
+    #                  3: Connexion(3, 1, 4, 1),
+    #                  4: Connexion(4, 2, 4, 1),
+    #                  5: Connexion(5, 0, 4, -1.7),
+    #                  6: Connexion(6, 4, 3, -2)}
+    # nn.generateNetwork()
+    # nn2 = NeuralNetwork(31, 2, 1)
+
+    # print("distance :    ", spawing_pool.distance(nn, nn2))
+
+    # spawing_pool.population[42] = nn
+
+    for _ in range(50):
         spawing_pool.newGeneration()
+        print(len(spawing_pool.species))
         print(spawing_pool.best_individual.fitness)
         # spawing_pool.best_individual.display()
-        printOR(spawing_pool.best_individual)
+        printXOR(spawing_pool.best_individual)
 
 
 def test():
     nn = NeuralNetwork(0, 2, 1)
+    nn.connexions = {0: Connexion(0, 0, 3, -0.5),
+                     1: Connexion(1, 1, 3, 1),
+                     2: Connexion(2, 2, 3, 1),
+                     3: Connexion(3, 1, 4, 1),
+                     4: Connexion(4, 2, 4, 1),
+                     5: Connexion(5, 0, 4, -1.7),
+                     6: Connexion(6, 4, 3, -2)}
     nn.generateNetwork()
     print(len(nn.connexions))
-    for c in nn.connexions.values():
-        c.display()
-    nn.connexions = {0: Connexion(0, 0, 3, -1),
-                     1: Connexion(1, 1, 3, 1),
-                     2: Connexion(2, 2, 3, 1)}
-    nn.generateNetwork()
-    printOR(nn)
+    nn.display()
+    printXOR(nn)
 
 
-solveOR()
+solveXOR()
 # test()
