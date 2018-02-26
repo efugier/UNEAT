@@ -113,20 +113,6 @@ class NeuralNetwork:
         for c in self.connexions.values():
             c.display()
 
-    # def isForwardOld(self, neuron_id1, neuron_id2):
-    #     """Makes sure a feed forward connexion should go from id1 to id2
-    #     return True if yes, False if no
-    #     O(|connexions|)"""
-    #     print("-------")
-    #     for c in self.connexions.values():
-    #         c.display()
-    #     print(neuron_id1, "->", neuron_id2)
-    #     for i, _ in self.neurons[neuron_id2].input_list:
-    #         if neuron_id2 == i or neuron_id2 in range(self.nb_input) or not self.isForward(neuron_id1, i):
-    #             return False
-
-    #     return True
-
     def generateNetwork(self):
         """generates the neural network using its connexion list
             O(|self.connexions|)"""
