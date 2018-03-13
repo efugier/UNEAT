@@ -1,15 +1,7 @@
 """
-This module contains:
-    - 4 classes: Connexion, Neuron, NeuralNetwork, SpawingPool
-    - Shaping function that modify a neural network:
-        - newConnexion
-        - newRecursiveConnexion
-    - save and load functions
-
 TODO:
-    - optimise the connexions for the activation_function
-    - explicit fitness sharing
-        -https://pdfs.semanticscholar.org/b32f/71b58da453f60e63f97a1bc7ae2e717b4ea3.pdf
+- update the new generation function
+
 """
 
 
