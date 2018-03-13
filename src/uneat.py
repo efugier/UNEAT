@@ -1,9 +1,7 @@
 """
 TODO:
 - update the new generation function
-
 """
-
 
 from pickle import Pickler, Unpickler
 from connexion import Connexion
@@ -35,7 +33,7 @@ def load(file_name='latest_NN'):
 
 # Test functions
 
-def evalOR(nn_list):
+def evalXOR(nn_list):
     pat = [[[0, 0], [0]],
            [[0, 1], [1]],
            [[1, 0], [1]],
@@ -49,7 +47,7 @@ def evalOR(nn_list):
     return res
 
 
-def printOR(nn: NeuralNetwork):
+def printXOR(nn: NeuralNetwork):
     pat = [[[0, 0], [0]],
            [[0, 1], [1]],
            [[1, 0], [1]],
@@ -58,17 +56,34 @@ def printOR(nn: NeuralNetwork):
         print(p[0], '->', (nn.evaluateNetwork(p[0])))
 
 
-def solveOR():
-    spawing_pool = SpawingPool(evaluation_function=evalOR)
+def solveXOR():
+    spawing_pool = SpawingPool(evaluation_function=evalXOR)
 
     spawing_pool.initPopulation()
 
+
+    # nn = NeuralNetwork(42, 2, 1)
+    # nn.connexions = {0: Connexion(0, 0, 3, -0.5),
+    #                  1: Connexion(1, 1, 3, 1),
+    #                  2: Connexion(2, 2, 3, 1),
+    #                  3: Connexion(3, 1, 4, 1),
+    #                  4: Connexion(4, 2, 4, 1),
+    #                  5: Connexion(5, 0, 4, -1.7),
+    #                  6: Connexion(6, 4, 3, -2)}
+    # nn.generateNetwork()
+    # nn2 = NeuralNetwork(31, 2, 1)
+
+    # print("distance :    ", spawing_pool.distance(nn, nn2))
+
+    # spawing_pool.population[42] = nn
+
     for _ in range(50):
         spawing_pool.newGeneration()
+        print(len(spawing_pool.species))
         print(spawing_pool.best_individual.fitness)
-        print(spawing_pool.max_fitness)
-        printOR(spawing_pool.best_individual)
-    spawing_pool.best_individual.display()
+        # spawing_pool.best_individual.display()
+        printXOR(spawing_pool.best_individual)
+
 
 
 def test():
@@ -82,10 +97,9 @@ def test():
                      6: Connexion(6, 4, 3, -2)}
     nn.generateNetwork()
     print(len(nn.connexions))
-    for c in nn.connexions.values():
-        c.display()
-    printOR(nn)
+    nn.display()
+    printXOR(nn)
 
 
-solveOR()
+solveXOR()
 # test()
