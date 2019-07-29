@@ -4,5 +4,7 @@
 
 An implementation from scratch of a general-purpose algorithm performing *NeuroEvolution through Augmenting Topologies* (NEAT) in python. It's capable of both generating a neural network whose architecture's evolves during the training process.
 
+Refactoring attempt of [this](https://github.com/efugier/NEAT).
+
 #### Credits
 The NEAT algorithm that inspired this project was introduced by Kenneth O. Stanley and Risto Miikkulainen in 2002 in [this paper](http://nn.cs.utexas.edu/downloads/papers/stanley.ec02.pdf).
